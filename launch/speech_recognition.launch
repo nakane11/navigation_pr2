@@ -45,10 +45,10 @@
         clear_params="true" >
     <remap from="~input1" to="/robotsound/is_speaking" />
     <remap from="~input2" to="/robotsound_jp/is_speaking" />
-    <remap from="~input3" to="/sound_play/is_speaking" />
+    <!-- <remap from="~input3" to="/sound_play/is_speaking" /> -->
     <remap from="~output/or" to="/is_speaking" />
     <rosparam>
-      number_of_input: 3
+      number_of_input: 2
     </rosparam>
   </node>
 
@@ -89,6 +89,9 @@
   </node>
 
   <group if="$(arg use_vosk)" >
+    <node name="is_speaking_relay" pkg="topic_tools" type="relay"
+          args="/is_speaking /tts/status" />
+
     <node name="speech_recognition"
           pkg="ros_vosk" type="vosk_node.py"
           respawn="true" >
