@@ -19,7 +19,7 @@ class SpeakNode(object):
         self.update_volume()
         self.sound_client.say(text, volume=vol)
 
-    def update_volume(self, req):
+    def update_volume(self):
         rospy.get_param('~volume', 1.0)
         if volume > 1.0 or volume < 0.0:
             rospy.loginfo("Volume is out of range. Do nothing.")
