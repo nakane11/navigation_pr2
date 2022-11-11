@@ -97,10 +97,12 @@
           respawn="true" >
     </node>
 
-    <node name="string_to_speech_recognition_candidates" pkg="navigation_pr2" type="string_to_speech_recognition_candidates.py"
-          respawn="true">
-      <remap from="~input" to="/speech_reognition/final_result" />
-      <remap from="~output" to="/Tablet/voice" />
+    <node name="string_to_speech_recognition_candidates"
+          pkg="topic_tools" type="transform"
+          args="/speech_recognition/final_result /Tablet/voice
+                speech_recognition_msgs/SpeechRecognitionCandidates
+                'speech_recognition_msgs.msg.SpeechRecognitionCandidates(transcript=[m.data])'
+                --import speech_recognition_msgs" >
     </node>
   </group>
 
