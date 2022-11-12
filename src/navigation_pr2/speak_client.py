@@ -19,3 +19,7 @@ class SpeakClient():
     def get_volume(self):
         volume =rospy.get_param(self.volume_name)
         return volume
+
+    def set_volume(self, volume):
+        volume =rospy.set_param(self.volume_name, volume)
+        rospy.loginfo('set volume to {}'.format(volume))
