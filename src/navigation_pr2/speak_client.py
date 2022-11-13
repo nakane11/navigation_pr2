@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from std_msgs.msg import String
+import rospy
 
 class SpeakClient():
     def __init__(self, server_name='/speak_node'):
         self.topic_name = server_name + '/say'
         self.volume_name = server_name + '/volume'
-        self.pub = rospy.Publisher(self.topic_name, String)
+        self.pub = rospy.Publisher(self.topic_name, String, queue_size=1)
 
     def say(self, text):
         str = String(data=text)
