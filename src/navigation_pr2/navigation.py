@@ -48,30 +48,36 @@ class GetSpeechinMoving(smach.State):
         rospy.sleep(20.0)
         return 'aborted'
 
+class CheckGoal(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded', 'unreached'],
+                             output_keys=['next_point'])
+
+    def execute(self, userdata):
+        rospy.sleep(10)
+        return 'unreached'
+
 class CheckElevator(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['use', 'not use', 'aborted'])
+        smach.State.__init__(self, outcomes=['use', 'not use', 'aborted'],
+                             input_keys=['next_point'],
+                             output_keys=['target_floor'])
 
     def execute(self, userdata):
         return 'use'
 
 class MoveToElevator(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+                             input_keys=['target_floor'])
 
     def execute(self, userdata):
         return 'succeeded'
 
 class SendMoveTo(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
-
-    def execute(self, userdata):
-        return 'succeeded'
-
-class CheckGoal(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'unreached'])
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+                             input_keys=['next_point'])
 
     def execute(self, userdata):
         return 'succeeded'
@@ -86,7 +92,7 @@ class Interrupt(smach.State):
 def con_moving_child_term_cb(outcome_map):
     if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
         return True
-    if outcome_map['TALK_IN_MOVING'] == 'interrupt':
+    if outcome_map['TALK_IN_MOVING'] == 'interrupt' or outcome_map['VIRTUAL_FORCE'] == 'interrupt':
         return True
     if outcome_map['SEND_WAYPOINT'] == 'aborted':
         return True
@@ -98,7 +104,7 @@ def con_moving_child_term_cb(outcome_map):
 def con_moving_out_cb(outcome_map):
     if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
         return 'succeeded'
-    if outcome_map['TALK_IN_MOVING'] == 'interrupt':
+    if outcome_map['TALK_IN_MOVING'] == 'interrupt' or outcome_map['VIRTUAL_FORCE'] == 'interrupt':
         return 'interrupt'
     if outcome_map['SEND_WAYPOINT'] == 'aborted':
         return 'aborted'

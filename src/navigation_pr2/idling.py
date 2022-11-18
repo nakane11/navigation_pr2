@@ -26,9 +26,7 @@ class Idling(smach.State):
         else:
             self.speak.parrot(speech_roman)
             return 'aborted'
-        
 
-        
         return 'start mapping'
 
 class Initialize(smach.State):
