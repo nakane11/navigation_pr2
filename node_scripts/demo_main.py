@@ -4,6 +4,7 @@ from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
 from navigation_pr2.idling import *
+from navigation_pr2.virtual_force import *
 
 import rospy
 import smach
@@ -40,7 +41,8 @@ class NavigationSmach():
                 smach.StateMachine.add('WAIT_FOR_TEACHING', WaitForTeaching(client=self.speak),
                                        transitions={'timeout':'EXPLAIN',
                                                     'name received':'SEND_WITH_NAME',
-                                                    'end':'succeeded',                                                                            'request navigation':'request navigation',
+                                                    'end':'succeeded',
+                                                    'request navigation':'request navigation',
                                                     'aborted':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SEND_WITH_NAME', SendWithName(),
                                        transitions={'send spot with name':'SET_MAP_AVAILABLE'})
@@ -94,9 +96,19 @@ class NavigationSmach():
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_GOAL',
                                                         'aborted':'aborted'})
+                sm_virtual_force = smach.StateMachine(outcomes=['aborted', 'inturrupt'])
+                with sm_virtual_force:
+                    smach.StateMachine.add('GET_VIRTUAL_FORCE', GetVirtualForce(client=self.speak),
+                                           transitions={'wait':'ASK_WHAT',
+                                                        'preempted':'aborted'})
+                    smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
+                                           transitions={'timeout':'GET_VIRTUAL_FORCE',
+                                                        'inturrupt':'inturrupt',
+                                                        'preempted':'aborted'})
 
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
+                smach.Concurrence.add('VIRTUAL_FORCE', sm_virtual_force)
 
 
             smach.StateMachine.add('CHECK_IF_NAVIGATION_AVAILABLE', CheckIfNavigationAvailable(),
