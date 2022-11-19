@@ -4,7 +4,7 @@ from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
 from navigation_pr2.idling import *
-from navigation_pr2.virtual_force import *
+from navigation_pr2.hand_impact import *
 
 import rospy
 import smach
@@ -96,19 +96,21 @@ class NavigationSmach():
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_GOAL',
                                                         'aborted':'aborted'})
-                sm_virtual_force = smach.StateMachine(outcomes=['aborted', 'inturrupt'])
-                with sm_virtual_force:
-                    smach.StateMachine.add('GET_VIRTUAL_FORCE', GetVirtualForce(client=self.speak),
-                                           transitions={'wait':'ASK_WHAT',
-                                                        'preempted':'aborted'})
+                sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'inturrupt'])
+                with sm_hand_impact:
+                    smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
+                                           transitions={'succeeded':'ASK_WHAT',
+                                                        'detected':'WAIT_FOR_HAND_IMPACT',
+                                                        'preempted':'aborted',
+                                                        'aborted':'WAIT_FOR_HAND_IMPACT'})
                     smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
-                                           transitions={'timeout':'GET_VIRTUAL_FORCE',
+                                           transitions={'timeout':'WAIT_FOR_HAND_IMPACT',
                                                         'inturrupt':'inturrupt',
                                                         'preempted':'aborted'})
 
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
-                smach.Concurrence.add('VIRTUAL_FORCE', sm_virtual_force)
+                smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
 
             smach.StateMachine.add('CHECK_IF_NAVIGATION_AVAILABLE', CheckIfNavigationAvailable(),
