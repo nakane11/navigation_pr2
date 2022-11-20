@@ -90,9 +90,9 @@ class Interrupt(smach.State):
         return 'resume'
 
 def con_moving_child_term_cb(outcome_map):
-    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
+    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded' or outcome_map['WAIT_FOR_HAND_IMPACT'] == 'succeeded':
         return True
-    if outcome_map['TALK_IN_MOVING'] == 'interrupt' or outcome_map['VIRTUAL_FORCE'] == 'interrupt':
+    if outcome_map['TALK_IN_MOVING'] == 'interrupt':
         return True
     if outcome_map['SEND_WAYPOINT'] == 'aborted':
         return True
@@ -104,12 +104,14 @@ def con_moving_child_term_cb(outcome_map):
 def con_moving_out_cb(outcome_map):
     if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
         return 'succeeded'
-    if outcome_map['TALK_IN_MOVING'] == 'interrupt' or outcome_map['VIRTUAL_FORCE'] == 'interrupt':
+    if outcome_map['TALK_IN_MOVING'] == 'interrupt':
         return 'interrupt'
     if outcome_map['SEND_WAYPOINT'] == 'aborted':
         return 'aborted'
     if outcome_map['TALK_IN_MOVING'] == 'start mapping':
         return 'start mapping'
+    if outcome_map['HAND_IMPACT'] == 'succeeded':
+        return 'ask'
            
 
                               

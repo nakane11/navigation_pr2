@@ -39,7 +39,7 @@ class WaitforHandImpact(smach.State):
         
 class AskWhat(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['timeout', 'inturrupt', 'preempted'])
+        smach.State.__init__(self, outcomes=['timeout', 'interrupt', 'preempted'])
         self.speak = client
         
     def execute(self, userdata):
@@ -50,5 +50,5 @@ class AskWhat(smach.State):
         speech_roman = rospy.get_param('~speech_roman')
         rospy.delete_param('~speech_roman')
         if re.findall('toma', speech_roman):
-            return 'inturrupt'
+            return 'interrupt'
         return 'preeempted'

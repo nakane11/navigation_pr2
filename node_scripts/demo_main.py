@@ -66,7 +66,7 @@ class NavigationSmach():
         sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'],
                                            input_keys=['map_available', 'goal_spot'])
         with sm_navigation:
-            con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded',
+            con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask',
                                                      'interrupt', 'aborted', 'start mapping'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
@@ -96,17 +96,13 @@ class NavigationSmach():
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_GOAL',
                                                         'aborted':'aborted'})
-                sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'inturrupt'])
+                sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:
                     smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
-                                           transitions={'succeeded':'ASK_WHAT',
+                                           transitions={'succeeded':'succeeded',
                                                         'detected':'WAIT_FOR_HAND_IMPACT',
                                                         'preempted':'aborted',
                                                         'aborted':'WAIT_FOR_HAND_IMPACT'})
-                    smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
-                                           transitions={'timeout':'WAIT_FOR_HAND_IMPACT',
-                                                        'inturrupt':'inturrupt',
-                                                        'preempted':'aborted'})
 
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
@@ -123,10 +119,16 @@ class NavigationSmach():
                                    transitions={'outcome':'MOVING',
                                                 'succeeded':'succeeded',
                                                 'start mapping':'start mapping',
-                                                'interrupt':'INTERRUPT'})
+                                                'interrupt':'INTERRUPT',
+                                                'ask':'ASK_WHAT'})
             smach.StateMachine.add('INTERRUPT', Interrupt(),
                                    transitions={'resume': 'MOVING',
                                                 'aborted':'aborted'})
+            smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
+                                   transitions={'timeout':'MOVING',
+                                                'interrupt':'INTERRUPT',
+                                                'preempted':'aborted'})
+
             
         ###################################
         ####### MAIN STATE MACHINE ########
