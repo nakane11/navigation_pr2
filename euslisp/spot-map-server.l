@@ -12,11 +12,11 @@
 (setq *scene* (make-scene-by-tf *tfl*))
 
 ;; server
-(defclass map-server
+(defclass spot-map-server
   :slots (record-spot-action spot-graph spot-list prev-spot spot-label))
   ;; :slots (label mode spot-msg spot-graph spot-list path prev-n goal-n goal-name sol))
 
-(defmethod map-server
+(defmethod spot-map-server
   (:init ()
     (setq spot-graph (instance graph :init))
     (setq spot-list nil)
@@ -102,7 +102,6 @@
                          (push (cdr name) spot-list))
                        (setq prev-spot i)
                        (return-from :add-spot))))))
-             (ros::ros-info "~A" name)
              (let (n)
                (setq n (instance node :init (or (if name (car name) nil)
                                                 (format nil "~A" spot-label))))
@@ -124,7 +123,7 @@
 
   (:remove-spot (name-jp)
                 (dolist (i (send spot-graph :nodes))
-                  (when (string= (send i :name-jp) name-jp)
+                  (when (string= (send i :get :name-jp) name-jp)
                     (send spot-graph :remove-node i)
                     (remove name-jp spot-list)))
                )
@@ -226,7 +225,7 @@
     )
   )
 
-(setq *ms* (instance map-server :init))
+(setq *ms* (instance spot-map-server :init))
 (ros::rate 20)
 (do-until-key
  (ros::spin-once)

@@ -1,23 +1,29 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import smach
 import re
 import rospy
+import actionlib
 from navigation_pr2.utils import *
+from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted'],
-                             output_keys=['new_spot_name'])
+                             output_keys=['new_spot_name', 'new_spot_name_jp'])
         self.speak = client
 
     def execute(self, userdata):
         if not wait_for_speech(timeout=30):
             return 'timeout'
+        speech_raw = rospy.get_param('~speech_raw')
         speech_roman = rospy.get_param('~speech_roman')
+        rospy.delete_param('~speech_raw')
         rospy.delete_param('~speech_roman')
         if re.findall('kokoga|dayo', speech_roman):
             userdata.new_spot_name = re.search(r'^kokoga(.*)dayo$', speech_roman).groups()[0]
+            userdata.new_spot_name_jp = re.search(r'^ここが(.*)だよ$', speech_raw.encode('utf-8')).groups()[0]
             return 'name received'
         elif re.findall('owari', speech_roman):
             return 'end'
@@ -29,12 +35,19 @@ class WaitForTeaching(smach.State):
 
 class SendWithName(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
+        smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name', 'new_spot_name_jp'])
+        self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
+        self.ac.wait_for_server()
 
     def execute(self, userdata):
         name = userdata.new_spot_name
-        rospy.loginfo("add new spot: {}".format(name))
-        #send goal
+        name_jp = userdata.new_spot_name_jp
+        rospy.loginfo("add new spot: {}".format(name_jp))
+        goal = RecordSpotGoal()
+        goal.command = 1
+        goal.name = name
+        goal.name_jp = name_jp
+        self.ac.send_goal(goal)
         return 'send spot with name'
 
 class SendWithoutName(smach.State):
