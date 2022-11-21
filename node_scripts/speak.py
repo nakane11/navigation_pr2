@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from sound_play.libsoundplay import SoundClient
+from std_msgs.msg import String
 import rospy
 
 class SpeakNode(object):
@@ -13,14 +14,14 @@ class SpeakNode(object):
         else:
             rospy.logerr("{} is not supported".format(self.lang))
             return
-        self.sub = rospy.Subscriber("say", String, self.say)
+        self.sub = rospy.Subscriber("~say", String, self.say)
 
     def say(self, msg):
         self.update_volume()
-        self.sound_client.say(text, volume=vol)
+        self.sound_client.say(msg.data, volume=self.volume)
 
     def update_volume(self):
-        rospy.get_param('~volume', 1.0)
+        volume = rospy.get_param('~volume', 1.0)
         if volume > 1.0 or volume < 0.0:
             rospy.loginfo("Volume is out of range. Do nothing.")
         else:
