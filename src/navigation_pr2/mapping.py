@@ -5,6 +5,7 @@ import smach
 import re
 import rospy
 import actionlib
+from std_srvs.srv import Empty
 from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 
@@ -50,17 +51,22 @@ class SendWithName(smach.State):
         self.ac.send_goal(goal)
         return 'send spot with name'
 
-class SendWithoutName(smach.State):
+class SwitchRecordWithoutName(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['send spot', 'preempted'])
+        smach.State.__init__(self, outcomes=['preempted'])
+        rospy.wait_for_service('start_auto_map')
+        self.start = rospy.ServiceProxy('start_auto_map', Empty)
+        rospy.wait_for_service('stop_auto_map')
+        self.stop = rospy.ServiceProxy('stop_auto_map', Empty)
 
     def execute(self, userdata):
-        #send goal
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
-        rospy.sleep(10.0)
-        return 'send spot'
+        self.start()
+        while not rospy.is_shutdown():
+            if self.preempt_requested():
+                self.stop()
+                self.service_preempt()
+                return 'preempted'
+            rospy.sleep(1.0)
 
 class SetMapAvailable(smach.State):
     def __init__(self):

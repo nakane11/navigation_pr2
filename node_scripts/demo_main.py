@@ -35,7 +35,6 @@ class NavigationSmach():
             
             sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation'],
                                                      output_keys=['map_available'])
-            sm_record_without_name = smach.StateMachine(outcomes=['preempted'])
             
             with sm_record_with_name:
                 smach.StateMachine.add('WAIT_FOR_TEACHING', WaitForTeaching(client=self.speak),
@@ -51,13 +50,9 @@ class NavigationSmach():
 
                 smach.StateMachine.add('EXPLAIN', ExplainMapping(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
-
-            with sm_record_without_name:
-                smach.StateMachine.add('SEND_WITHOUT_NAME', SendWithoutName(),
-                                       transitions={'send spot':'SEND_WITHOUT_NAME'})
             
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
-            smach.Concurrence.add('RECORD_WITHOUT_NAME', sm_record_without_name)
+            smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
 
         ###################################
         ###########  NAVIGATION  ##########
