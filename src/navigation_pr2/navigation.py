@@ -50,36 +50,51 @@ class GetSpeechinMoving(smach.State):
 
 class CheckGoal(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'unreached'],
+        smach.State.__init__(self, outcomes=['succeeded', 'unreached', 'preempted'],
                              output_keys=['next_point'])
 
     def execute(self, userdata):
-        rospy.sleep(10)
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        rospy.sleep(5)
         return 'unreached'
 
 class CheckElevator(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['use', 'not use', 'aborted'],
+        smach.State.__init__(self, outcomes=['use', 'not use', 'aborted', 'preempted'],
                              input_keys=['next_point'],
                              output_keys=['target_floor'])
 
     def execute(self, userdata):
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        rospy.sleep(5)
         return 'use'
 
 class MoveToElevator(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
                              input_keys=['target_floor'])
 
     def execute(self, userdata):
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        rospy.sleep(5)
         return 'succeeded'
 
 class SendMoveTo(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
                              input_keys=['next_point'])
 
     def execute(self, userdata):
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        rospy.sleep(5)
         return 'succeeded'
 
 class Interrupt(smach.State):

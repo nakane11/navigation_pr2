@@ -6,6 +6,8 @@ import actionlib
 import smach
 import re
 import numpy as np
+from move_base_msgs.msg import MoveBaseAction
+from geometry_msgs.msg import Twist
 from pr2_gripper_sensor_msgs.msg import PR2GripperEventDetectorAction, PR2GripperEventDetectorGoal
 import pr2_gripper_sensor_msgs.msg
 from navigation_pr2.utils import *
@@ -20,12 +22,12 @@ class WaitforHandImpact(smach.State):
     def execute(self, userdata):
         goal = PR2GripperEventDetectorGoal()
         goal.command.trigger_conditions = pr2_gripper_sensor_msgs.msg.PR2GripperEventDetectorCommand.ACC
-        goal.command.acceleration_trigger_magnitude = 30.0
+        goal.command.acceleration_trigger_magnitude = 12.0
         self.ac.send_goal(goal)
-        if self.ac.wait_for_result(timeout=rospy.Duration(5)):
+        if self.ac.wait_for_result(timeout=rospy.Duration(8)):
             ret = self.ac.get_result()
             self.count += 1
-            if self.count > 2:
+            if self.count > 1:
                 return 'succeeded'
             else:
                 return 'detected'
@@ -41,8 +43,12 @@ class AskWhat(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'interrupt', 'preempted'])
         self.speak = client
+        self.ac = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.pub = rospy.Publisher('/base_controller/command', Twist, queue_size=1)
         
     def execute(self, userdata):
+        self.ac.cancel_all_goals()
+        self.pub.publish(Twist())
         self.speak.say('どうしましたか')
         if not wait_for_speech(timeout=10):
             self.speak.say('何でもありません')
