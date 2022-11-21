@@ -1,41 +1,19 @@
 (ros::roseus-add-msgs "geometry_msgs")
 (load "package://teach_spot/euslisp/marker.l")
 (load "package://pr2eus/pr2-interface.l")
+(load "package://navigation_pr2/euslisp/utils.l")
 (ros::roseus-add-msgs "navigation_pr2")
 (ros::roseus-add-srvs "navigation_pr2")
 
 (ros::roseus "spot_map_server")
 (pr2-init nil)
 
-;; utils
-(defun lstrip (bag str)
-  (declare (string str))
-  (declare (string bag))
-  (if (string= (subseq str 0 (length bag)) bag)
-      (subseq str (length bag))
-      nil))
-
-(defun rstrip (bag str)
-  (declare (string str))
-  (declare (string bag))
-  (if (string= (subseq str (- (length str) (length bag))) bag)
-      (subseq str 0 (- (length str) (length bag)))
-      nil))
-
-(defun counter-clockwise-angle-between-vectors (v1 v2 normal-vector)
-  (let* ((det (v. normal-vector (v* v1 v2)))
-         (dot (v. v1 v2))
-         (angle (+ (atan2 (- det) (- dot)) pi)))
-    (when (eps= angle 2pi)
-      (setq angle 0.0))
-    angle))
-
-(defun coords-difference (a b)
-  (/ (norm (send (send a :transformation b) :pos)) 1000))
+(setq *tfl* (instance ros::transform-listener :init))
+(setq *scene* (make-scene-by-tf *tfl*))
 
 ;; server
 (defclass map-server
-  :slots (spot-graph spot-list prev-spot spot-label))
+  :slots (record-spot-action spot-graph spot-list prev-spot spot-label))
   ;; :slots (label mode spot-msg spot-graph spot-list path prev-n goal-n goal-name sol))
 
 (defmethod map-server
@@ -47,7 +25,7 @@
          (instance ros::simple-action-server :init "record_spot"
                    navigation_pr2::RecordSpotAction
                    :execute-cb `(lambda-closure nil 0 0 (server goal)
-						      (send ,self :add-spot-cb server goal))))
+                                                (send ,self :add-spot-cb server goal))))
     (ros::advertise-service "start_auto_map" std_srvs::Empty #'send self :start-auto-map)
     (ros::advertise-service "stop_auto_map" std_srvs::Empty #'send self :stop-auto-map)
     (ros::advertise-service "list_spot_name" navigation_pr2::ListSpotName #'send self :list-spot-name)
@@ -57,20 +35,23 @@
      (ros::ros-info "init ended"))
 
   (:start-auto-map (req)
-    (setq *auto-map* t)
-    (send req :response))
+                   (setq *auto-map* t)
+                   (ros::ros-info "start auto map")
+                   (send req :response))
 
   (:stop-auto-map (req)
-    (setq *auto-map* nil)
-    (send req :response))
+                  (setq *auto-map* nil)
+                  (ros::ros-info "stop auto map")
+                  (send req :response))
 
   (:list-spot-name (req)
                    (let ((res (send req :response))
-                         (name-list null)
-                         (floor-list null))
+                         (name-list nil)
+                         (floor-list nil))
                      (dolist (i (send spot-graph :nodes))
-                       (push (send i :name) name-list)
-                       (push (send i :floor) floor-list))
+                       (push (send i :get :name-jp) name-list)
+                       (push (send i :get :floor) floor-list)
+                       )
                      (send res :names name-list)
                      (send res :floors floor-list)
                      res))
@@ -91,7 +72,6 @@
                    ((eq command 2)
                     (send self :remove-spot (send goal :goal :name_jp))
                     ))
-                   
                   (setq msg (send server :result :result t))
                   (send server :set-succeeded msg)))
                                
@@ -102,8 +82,8 @@
                    (ros::ros-info (format nil "rename ~A to ~A" (send prev-spot :name) (car name)))
                    (send prev-spot :put :coords coords)
                    (send prev-spot :name (car name))
-                   (send prev-spot :put :name-jp (cadr name))
-                   (push (cadr name) spot-list)
+                   (send prev-spot :put :name-jp (cdr name))
+                   (push (cdr name) spot-list)
                    (return-from :add-spot))))
              
              (dolist (i (send spot-graph :nodes))
@@ -118,21 +98,22 @@
                        (when name
                          (ros::ros-info "rename ~A to ~A" (send i :name) (car name)) ;;rename
                          (send i :name (car name))
-                         (send i :put :name-jp (cadr name))
-                         (push (cadr name) spot-list))
+                         (send i :put :name-jp (cdr name))
+                         (push (cdr name) spot-list))
                        (setq prev-spot i)
                        (return-from :add-spot))))))
-
+             (ros::ros-info "~A" name)
              (let (n)
                (setq n (instance node :init (or (if name (car name) nil)
                                                 (format nil "~A" spot-label))))
                (when name
-                 (send n :put :name-jp (cadr name))
-                 (push (cadr name) spot-list))
+                 (send n :put :name-jp (cdr name))
+                 (push (cdr name) spot-list))
                (unless name
                  (incf spot-label))
                (send n :put :coords coords)
-               (ros::ros-info "node ~A ~% coords:~A" (send n :name) (send n :get :coords))
+               (send n :put :floor (check-current-floor *scene* *tfl*))
+               (ros::ros-info "node ~A floor:~A~% coords:~A" (send n :name) (send n :get :floor) (send n :get :coords))
                (send spot-graph :add-node n)
 
                (when prev-spot
@@ -220,11 +201,12 @@
                  ;; )))
   
   (:run ()
+    (send record-spot-action :worker)
     ;; 自動保存
     (when *auto-map*
-      (setq current-coords (send *ri* :state :worldcoords))
+      (setq curr-coords (send *ri* :state :worldcoords))
       (when (null prev-spot)
-        (send self :add-spot))
+        (send self :add-spot curr-coords))
       (unless (null prev-spot)
         (setq prev-coords (send prev-spot :get :coords))
         (setq prev-v (send  prev-coords :rotate-vector #f(1 0 0)))
@@ -234,7 +216,7 @@
                             (< (rad2deg angle) 320))
                        (> (abs (coords-difference curr-coords prev-coords)) 0.3))
                   (> (abs (coords-difference curr-coords prev-coords)) 0.8))
-          (send self :add-spot current-coords))))
+          (send self :add-spot curr-coords))))
     ;; markerをpublishする
     (let* (spots (stamp (ros::time-now)) (header (instance std_msgs::header :init :stamp stamp :frame_id "/world")))
       (dolist (i (send spot-graph :nodes))
