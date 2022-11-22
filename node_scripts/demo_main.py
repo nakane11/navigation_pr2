@@ -141,12 +141,17 @@ class NavigationSmach():
         with sm:
             smach.StateMachine.add('INITIALIZE', Initialize(),
                                    transitions={'succeeded':'IDLING'})
-            smach.StateMachine.add('IDLING', Idling(client=self.speak),
-                                   transitions={'timeout':'IDLING',
+            smach.StateMachine.add('EXPLAIN', Explain(client=self.speak),
+                                   transitions={'succeeded':'IDLING'})
+            smach.StateMachine.add('INTRODUCTION', Introduction(client=self.speak),
+                                   transitions={'succeeded':'EXPLAIN'})
+            smach.StateMachine.add('IDLING', Idling(),
+                                   transitions={'timeout':'EXPLAIN',
                                                 'start navigation':'NAVIGATION',
                                                 'start mapping':'MAPPING',
                                                 'end':'succeeded',
-                                                'aborted':'IDLING'})
+                                                'aborted':'IDLING',
+                                                'intro':'INTRODUCTION'})
             smach.StateMachine.add('NAVIGATION', sm_navigation,
                                    transitions={'succeeded':'IDLING',
                                                 'aborted':'IDLING',
