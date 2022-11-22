@@ -6,6 +6,7 @@ import actionlib
 import smach
 import re
 import numpy as np
+import dynamic_reconfigure.client
 from move_base_msgs.msg import MoveBaseAction
 from geometry_msgs.msg import Twist
 from pr2_gripper_sensor_msgs.msg import PR2GripperEventDetectorAction, PR2GripperEventDetectorGoal
@@ -37,8 +38,7 @@ class WaitforHandImpact(smach.State):
         else:
             self.count = 0
             return 'aborted'
-            
-        
+
 class AskWhat(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'interrupt', 'preempted'])
@@ -58,3 +58,15 @@ class AskWhat(smach.State):
         if re.findall('toma', speech_roman):
             return 'interrupt'
         return 'preeempted'
+
+class ChangeSpeed(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)
+
+    def execute(self, userdata):
+        self.dr.update_configuration({"max_trans_vel" : 0.55})
+        self.dr.update_configuration({"max_vel_x" : 2.5})
+        self.dr.update_configuration({"acc_lim_x" : 2.5})
+        self.dr.update_configuration({"acc_lim_theta" : 5.0})
+        return 'succeeded'
