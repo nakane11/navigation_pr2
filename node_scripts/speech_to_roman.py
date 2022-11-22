@@ -16,6 +16,7 @@ class SpeechToRoman(ConnectionBasedTransport):
         self.kks.setMode('J', 'a')
         self.kks.setMode('H', 'a')
         self.kks.setMode('K', 'a')
+        self.kks.setMode('r', 'Kunrei')
         self.converter = self.kks.getConverter()
                     
     def subscribe(self):

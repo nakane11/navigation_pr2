@@ -5,6 +5,7 @@ import smach
 import re
 import rospy
 import actionlib
+import romkan
 from std_srvs.srv import Empty
 from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
@@ -23,8 +24,10 @@ class WaitForTeaching(smach.State):
         rospy.delete_param('~speech_raw')
         rospy.delete_param('~speech_roman')
         if re.findall('kokoga|dayo', speech_roman):
-            userdata.new_spot_name = re.search(r'^kokoga(.*)dayo$', speech_roman).groups()[0]
-            userdata.new_spot_name_jp = re.search(r'^ここが(.*)だよ$', speech_raw.encode('utf-8')).groups()[0]
+            extracted_name = re.search(r'^kokoga(.*)dayo$', speech_roman).groups()[0]
+            userdata.new_spot_name = extracted_name
+            # userdata.new_spot_name_jp = re.search(r'^ここが(.*)だよ$', speech_raw.encode('utf-8')).groups()[0]
+            userdata.new_spot_name_jp = romkan.to_hiragana(extracted_name)
             return 'name received'
         elif re.findall('owari', speech_roman):
             return 'end'
@@ -43,7 +46,7 @@ class SendWithName(smach.State):
     def execute(self, userdata):
         name = userdata.new_spot_name
         name_jp = userdata.new_spot_name_jp
-        rospy.loginfo("add new spot: {}".format(name_jp))
+        rospy.loginfo("add new spot: {}".format(name_jp.encode('utf-8')))
         goal = RecordSpotGoal()
         goal.command = 1
         goal.name = name
