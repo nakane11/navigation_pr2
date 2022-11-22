@@ -1,0 +1,22 @@
+<launch>
+  <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
+  <arg name="use_speaker" default="true" doc="Enable robot speaking" />
+
+  <include file="$(find navigation_pr2)/launch/speech_recognition.launch" >
+    <arg name="use_vosk" value="$(arg use_vosk)" />
+  </include>
+
+  <group if="$(arg use_speaker)">
+    <node name="speak_node"
+          pkg="navigation_pr2" type="speak.py"
+          respawn="true" >
+    </node>
+  </group>
+
+  <node pkg="roseus" type="roseus" name="spot_map_server" output="screen"
+        args="$(find navigation_pr2)/euslisp/spot-map-server.l" >
+    <param name="robot" value="pr2"/>
+  </node>
+  
+
+</launch>
