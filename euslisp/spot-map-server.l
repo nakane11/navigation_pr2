@@ -11,10 +11,8 @@
 (setq *tfl* (instance ros::transform-listener :init))
 (setq *scene* (make-scene-by-tf *tfl*))
 
-;; server
 (defclass spot-map-server
-  :slots (record-spot-action spot-graph spot-list prev-spot spot-label))
-  ;; :slots (label mode spot-msg spot-graph spot-list path prev-n goal-n goal-name sol))
+  :slots (record-spot-action spot-graph spot-list prev-spot spot-label sol))
 
 (defmethod spot-map-server
   (:init ()
@@ -26,13 +24,15 @@
                    navigation_pr2::RecordSpotAction
                    :execute-cb `(lambda-closure nil 0 0 (server goal)
                                                 (send ,self :add-spot-cb server goal))))
+    (ros::advertise "~poses" geometry_msgs::posestamped 1)
     (ros::advertise-service "start_auto_map" std_srvs::Empty #'send self :start-auto-map)
     (ros::advertise-service "stop_auto_map" std_srvs::Empty #'send self :stop-auto-map)
     (ros::advertise-service "list_spot_name" navigation_pr2::ListSpotName #'send self :list-spot-name)
+    (ros::advertise-service "find_path" navigation_pr2::Path #'send self :find-path-service)
     (setq spot-label 0)
 
-     ;; (setq sol (instance breadth-first-graph-search-solver :init))
-     (ros::ros-info "init ended"))
+    (setq sol (instance breadth-first-graph-search-solver :init))
+    (ros::ros-info "init ended"))
 
   (:start-auto-map (req)
                    (setq *auto-map* t)
@@ -56,6 +56,32 @@
                      (send res :floors floor-list)
                      res))
 
+  (:find-path-service (req)
+                      (let (res)
+                        (setq res (send req :response))
+                (setq goal (send req :goal_name))
+                (setq path (send self :find-path goal))
+                (when (null path)
+                  (send res :result nil)
+                  )
+                (when path
+                  (ros::ros-info "find path")
+                  (send self :publish-waypoints path)
+                  (send res :result t)
+                  )
+                res))
+
+  (:publish-waypoints (path)
+                      (dolist (i path)
+                        (let ((seq-count 0) (pose (instance geometry_msgs::posestamped :init)))
+                          (send (send pose :header) :frame_id "world")
+                          (send (send pose :header) :stamp (ros::time-now))
+                          (send (send pose :header) :seq seq-count)
+                          (incf seq-count)
+                          (send pose :pose (ros::coords->tf-pose (send (send i :state) :get :coords)))
+                          (ros::publish "~poses" pose)
+                          )))
+
   (:add-spot-cb (server goal)
                 (let ((command (send goal :goal :command)))
                   (cond
@@ -74,7 +100,29 @@
                     ))
                   (setq msg (send server :result :result t))
                   (send server :set-succeeded msg)))
-                               
+
+  (:find-path (goal-name)
+              (setq goal-n (send spot-graph :node goal-name))
+              (when goal-n
+                (ros::ros-info "goal-node: ~A" goal-n)
+                (let ((curr-coords (send *ri* :state :worldcoords))
+                      (nodes (send spot-graph :nodes))
+                      start-n path)
+                  (sort nodes #'(lambda (x y)
+                                  (< (abs (coords-difference curr-coords (send x :get :coords)))
+                                     (abs (coords-difference curr-coords (send y :get :coords))))))
+                  (setq start-n (car nodes))
+                  (ros::ros-info "start-node: ~A" start-n)
+                  (when start-n
+                    (send spot-graph :start-state start-n)
+                    (send spot-graph :goal-state goal-n)
+                    (setq path (send sol :solve spot-graph))
+                    (send sol :clear-open-list)
+                    (return-from :find-path path)
+                    )))
+              nil
+              )
+
   (:add-spot (coords &optional (name nil))
              (unless (or (null prev-spot) (null name))
                (when (< (abs (coords-difference coords (send prev-spot :get :coords))) 0.25)
@@ -127,77 +175,6 @@
                     (send spot-graph :remove-node i)
                     (remove name-jp spot-list)))
                )
-
-
-  ;; (:voice-cb (msg)
-
-
-  ;;                ((substringp "に連れて行って" text)
-  ;;                 (send *ri* :speak-jp "はい")
-  ;;                 (setq goal-name (rstrip "nitsureteitte" roman-text))
-  ;;                 (setq goal-n (send spot-graph :node goal-name))
-  ;;                 (ros::ros-info "goal-node: ~A" (send goal-n :name))
-  ;;                 (when goal-n
-  ;;                   (when (send goal-n :get :name-jp)
-  ;;                     (send *ri* :speak-jp (format nil "~Aに行きます" (send goal-n :get :name-jp))))
-  ;;                   (let ((spot-coords spot-msg) start-n)
-  ;;                     ;; (dolist (n (send spot-graph :nodes)) ;; if node exists nearby
-  ;;                     ;;   (when (< (abs (coords-difference spot-coords (send n :get :coords))) 0.3)
-  ;;                     ;;     (setq start-n n)
-  ;;                     ;;     (return)))
-  ;;                     (setq start-n prev-n)
-  ;;                     (ros::ros-info "start-node: ~A" start-n)
-  ;;                     (ros::ros-info "path0:~A" (length path))
-  ;;                     (when start-n
-  ;;                       (setq path nil)
-  ;;                       (send spot-graph :start-state start-n)
-  ;;                       (send spot-graph :goal-state goal-n)
-  ;;                       (setq path (send sol :solve spot-graph))
-  ;;                       (send sol :clear-open-list)
-  ;;                         (return-from :voice-cb)))))
-
-  ;;                 (ros::ros-info "solver failed")
-  ;;                 (send *ri* :speak-jp "道がわかりません")
-  ;;                 )
-
-  ;;                ((substringp "の行き方を教えて" text)
-  ;;                 (setq goal-name (rstrip "の行き方を教えて" text))
-  ;;                 (setq goal-n (send spot-graph :node goal-name))
-  ;;                 (ros::ros-info "goal-node: ~A" (send goal-n :name))
-  ;;                 (when goal-n
-  ;;                   (let ((spot-coords spot-msg) start-n)
-  ;;                     (setq start-n prev-n)
-  ;;                     (ros::ros-info "start-node: ~A" (send start-n :name))
-  ;;                     (when start-n
-  ;;                       (setq path nil)
-  ;;                       (setq path (send sol :solve-by-name spot-graph (send start-n :name) goal-name))
-  ;;                       (when path
-  ;;                         (dolist (i path)
-  ;;                           (ros::ros-info (format nil "~A" (send (send i :state) :name))))
-  ;;                         ;; (send *ri* :speak-jp "の順に通ります" :wait t)
-  ;;                         (return-from :voice-cb))))
-                    ;; (ros::ros-info "solver failed")))
-                 
-                 ;; ((and (substringp "ここが" text) (substringp "だよ" text))
-                 ;;  (let (spot-name (spot-coords spot-msg))
-                 ;;    (setq spot-name (list (lstrip "kokoga" (rstrip "dayo" roman-text))
-                 ;;                          (lstrip "ここが" (rstrip "だよ" text))))
-                 ;;    (unless (null spot-coords)
-                 ;;      (ros::ros-info "spot-name: ~A" (cadr spot-name))
-                 ;;      (push (cadr spot-name) spot-list)
-                 ;;      (send *ri* :speak-jp (format nil "~Aですね" (cadr spot-name)))
-                 ;;      (unless (null prev-n)
-                 ;;        (when (< (abs (coords-difference spot-coords (send prev-n :get :coords))) 0.25)
-                 ;;          (unless (send prev-n :get :name-jp)
-                 ;;            (ros::ros-info (format nil "rename ~A to ~A" (send prev-n :name) (car spot-name)))
-                 ;;            (send prev-n :put :coords spot-coords)
-                 ;;            (send prev-n :name (car spot-name))
-                 ;;            (send prev-n :put :name-jp (cadr spot-name))
-                 ;;            (return-from :voice-cb))))
-                 ;;      (send self :add-spot spot-coords spot-name))
-                 ;;    ))
-                 
-                 ;; )))
   
   (:run ()
     (send record-spot-action :worker)
