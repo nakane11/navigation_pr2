@@ -61,7 +61,7 @@ class NavigationSmach():
         sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'],
                                            input_keys=['map_available', 'goal_spot'])
         with sm_navigation:
-            con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask',
+            con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
@@ -104,25 +104,34 @@ class NavigationSmach():
                 smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
 
-            smach.StateMachine.add('CHECK_IF_NAVIGATION_AVAILABLE', CheckIfNavigationAvailable(),
-                                   transitions={'true':'GET_WAYPOINTS',
-                                                'false':'aborted'})
-            smach.StateMachine.add('GET_WAYPOINTS', GetWaypoints(),
-                                   transitions={'ready to move':'MOVING',
+            # smach.StateMachine.add('CHECK_IF_NAVIGATION_AVAILABLE', CheckIfNavigationAvailable(),
+            #                        transitions={'true':'GET_WAYPOINTS',
+            #                                     'false':'aborted'})
+            smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
+                                   transitions={'succeeded':'GET_WAYPOINTS',
+                                                'aborted':'aborted'})
+            smach.StateMachine.add('GET_WAYPOINTS', GetWaypoints(client=self.speak),
+                                   transitions={'ready to move':'START_NAVIGATION',
                                                 'no path found':'aborted'})
+            smach.StateMachine.add('START_NAVIGATION', StartNavigation(client=self.speak),
+                                   transitions={'succeeded': 'MOVING'})
             smach.StateMachine.add('MOVING', con_moving,
                                    transitions={'outcome':'MOVING',
-                                                'succeeded':'succeeded',
+                                                'aborted':'FINISH_NAVIGATION',
+                                                'succeeded':'FINISH_NAVIGATION',
                                                 'start mapping':'start mapping',
                                                 'interrupt':'INTERRUPT',
-                                                'ask':'ASK_WHAT'})
+                                                'ask':'ASK_WHAT',
+                                                'reached': 'FINISH_NAVIGATION'})
             smach.StateMachine.add('INTERRUPT', Interrupt(),
                                    transitions={'resume': 'MOVING',
-                                                'aborted':'aborted'})
+                                                'aborted':'FINISH_NAVIGATION'})
             smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
                                    transitions={'timeout':'MOVING',
                                                 'interrupt':'INTERRUPT',
-                                                'preempted':'aborted'})
+                                                'preempted':'FINISH_NAVIGATION'})
+            smach.StateMachine.add('FINISH_NAVIGATION', FinishNavigation(),
+                                   transitions={'succeeded': 'succeeded'})
 
             
         ###################################
