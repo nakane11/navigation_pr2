@@ -60,6 +60,7 @@ add_service_files(
   FILES
   ListSpotName.srv
   Path.srv
+  ChangeFloor.srv
 )
 
 ## Generate actions in the 'action' folder
