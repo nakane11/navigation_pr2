@@ -8,11 +8,11 @@
 (ros::roseus "spot_map_server")
 (pr2-init nil)
 
-(setq *tfl* (instance ros::transform-listener :init))
-(setq *scene* (make-scene-by-tf *tfl*))
+;; (setq *tfl* (instance ros::transform-listener :init))
+;; (setq *scene* (make-scene-by-tf *tfl*))
 
 (defclass spot-map-server
-  :slots (record-spot-action spot-graph spot-list prev-spot spot-label sol))
+  :slots (record-spot-action spot-graph spot-list prev-spot spot-label sol current-floor))
 
 (defmethod spot-map-server
   (:init ()
@@ -29,10 +29,32 @@
     (ros::advertise-service "stop_auto_map" std_srvs::Empty #'send self :stop-auto-map)
     (ros::advertise-service "list_spot_name" navigation_pr2::ListSpotName #'send self :list-spot-name)
     (ros::advertise-service "find_path" navigation_pr2::Path #'send self :find-path-service)
+    (ros::advertise-service "change_floor" navigation_pr2::ChangeFloor #'send self :change-floor)
     (setq spot-label 0)
+    (setq current-floor "initial")
+    (setq *spot-graph-alist* '((empty nil)))
 
     (setq sol (instance breadth-first-graph-search-solver :init))
     (ros::ros-info "init ended"))
+
+  (:change-floor (req)
+                 (let (res)
+                   (setq res (send req :response))
+                   (setq floor (send req :floor))
+                   (ros::ros-info "change floor ~A to ~A" current-floor floor)
+                   (when (assoc current-floor *spot-graph-alist* :test #'string=)
+                     (remove current-floor *spot-graph-alist* :test #'string= :key #'(lambda (x) (car x))))
+                   (setq *spot-graph-alist* (acons current-floor spot-graph *spot-graph-alist*))
+                   (ros::ros-info "~A" *spot-graph-alist*)
+                   (setq next-graph (cdr (assoc floor *spot-graph-alist* :test #'string=)))
+                   (ros::ros-info "~A" next-graph)
+                   (unless next-graph
+                     (setq spot-graph (instance graph :init)))
+                   (when next-graph
+                     (setq spot-graph next-graph))
+                   (setq current-floor floor)
+                   res
+                   ))
 
   (:start-auto-map (req)
                    (setq *auto-map* t)
@@ -159,7 +181,7 @@
                (unless name
                  (incf spot-label))
                (send n :put :coords coords)
-               (send n :put :floor (check-current-floor *scene* *tfl*))
+               (send n :put :floor current-floor)
                (ros::ros-info "node ~A floor:~A~% coords:~A" (send n :name) (send n :get :floor) (send n :get :coords))
                (send spot-graph :add-node n)
 
