@@ -29,7 +29,7 @@
     (ros::advertise-service "stop_auto_map" std_srvs::Empty #'send self :stop-auto-map)
     (ros::advertise-service "list_spot_name" navigation_pr2::ListSpotName #'send self :list-spot-name)
     (ros::advertise-service "find_path" navigation_pr2::Path #'send self :find-path-service)
-    (ros::advertise-service "change_floor" navigation_pr2::ChangeFloor #'send self :change-floor)
+    (ros::advertise-service "~change_floor" navigation_pr2::ChangeFloor #'send self :change-floor)
     (setq spot-label 0)
     (setq current-floor "initial")
     (setq *spot-graph-alist* '((empty nil)))
