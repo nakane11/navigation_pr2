@@ -1,21 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+import os
+import psutil
+import rosgraph
+import rosnode
+import subprocess
+import time
+try:
+    from xmlrpc.client import ServerProxy
+except ImportError:
+    from xmlrpclib import ServerProxy
+
 import rospy
 import tf
 import dynamic_reconfigure.client
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from navigation_pr2.srv import *
-
-import os
-import psutil
-import subprocess
-import time
-import rosgraph
-import rosnode
-try:
-    from xmlrpc.client import ServerProxy
-except ImportError:
-    from xmlrpclib import ServerProxy
 
 
 class RobotService(object):
@@ -23,23 +24,19 @@ class RobotService(object):
         self.name = 'robot_service'
         self.master = rosgraph.Master(self.name)
 
-    def launch_node(self, pkg, node, node_name, args='', remap=None, timeout=15.0, polling=1.0, wait=True):
-        u"""ノードの起動"""
+    def launch_node(self, pkg, node, node_name, args='', remap={}, timeout=15.0, polling=1.0, wait=True):
         rospy.loginfo("Start running {}".format(node_name))
-        if remap is not None:
-            remap_list = ["{0}:={1}".format(key, value) for key, value in remap.items()]
-        else:
-            remap_list = []
         proc_app = subprocess.Popen(
-            ['/opt/ros/{0}/bin/rosrun'.format(os.environ['ROS_DISTRO']),
-             pkg, node, args] + ['__name:={}'.format(node_name)] + remap_list,
+            ['/opt/ros/{0}/bin/rosrun'.format(os.environ['ROS_DISTRO']), pkg, node, args]\
+            + (['__name:={}'.format(node_name)] if node_name else [])\
+            + ["{0}:={1}".format(key, value) for key, value in remap.items()],
             close_fds=True)
 
         def nodes_ready():
             try:
+                rospy.loginfo("Waiting for {} ready ...".format(node_name))
                 pid = ServerProxy(rosnode.get_api_uri(
                     self.master, node_name, skip_cache=True)).getPid(self.name)
-                print(pid)
                 if pid[0]:
                     return True
             except Exception:
@@ -48,11 +45,11 @@ class RobotService(object):
 
         if wait:
             if not self.wait_until(nodes_ready, timeout=timeout, polling=polling):
+                rospy.loginfo("Failed running {}".format(node_name))
                 return False
         return proc_app
 
     def kill_process(self, proc):
-        u"""孫プロセスを含めて全てのプロセスを落とす"""
         try:
             parent = psutil.Process(proc.pid)
         except psutil.NoSuchProcess:
@@ -68,15 +65,10 @@ class RobotService(object):
                 child.kill()
 
     def term_node(self, proc):
-        u"""ノードを停止する"""
         if proc is not None:
             self.kill_process(proc)
 
     def wait_until(self, func, timeout=None, polling=1.0, *args, **kwargs):
-        u"""funcが条件を満たすまでポーリングしながら待つ
-
-        timeout=Noneで無限待ち
-        """
         if timeout is not None:
             end_time = time.time() + timeout
         else:
@@ -93,19 +85,20 @@ class MapManager(object):
     
     def __init__(self):
         self.rs = RobotService()
+        self.procs = {}
+        self.current_floor = None
         rospy.on_shutdown(self.handler)
         self.listener = tf.TransformListener()
         self.conf = dynamic_reconfigure.client.Client('/amcl', timeout=5.0)
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
         rospy.Service('~change_floor', ChangeFloor, self.floor_cb)
 
-        self.procs = {'gmapping':None, 'saver':None, 'server':None, 'tf_to_map':None, 'tf_from_world':None}
-        self.current_floor = None
-
     def handler(self):
-        for key, proc in self.procs:
-            if proc is not None:
+        try:
+            for key, proc in self.procs:
                 self.rs.term_node(proc)
+        except:
+            pass
 
     def floor_cb(self, req):
         if req.command == 0:
@@ -195,7 +188,8 @@ class MapManager(object):
         self.procs['gmapping'] = gmapping
 
     def stop_gmapping(self):
-        self.rs.term_node(self.procs['gmapping'])
+        if 'gmapping' in self.procs:
+            self.rs.term_node(self.procs['gmapping'])
 
     # save /map as 6f.yaml
     def start_map_saver(self, floor):
@@ -207,7 +201,8 @@ class MapManager(object):
         self.procs['saver'] = saver
 
     def stop_map_saver(self):
-        self.rs.term_node(self.procs['saver'])
+        if 'saver' in self.procs:
+            self.rs.term_node(self.procs['saver'])
 
     # serve /map topic of /map frame from 6f.yaml
     def start_map_server(self, floor):
@@ -219,7 +214,8 @@ class MapManager(object):
         self.procs['server'] = server
 
     def stop_map_server(self):
-        self.rs.term_node(self.procs['server'])
+        if 'server' in self.procs:
+            self.rs.term_node(self.procs['server'])
 
     # publish /world->/6f and /6f->/map tf
     def start_tf_publisher(self, floor):
@@ -237,8 +233,10 @@ class MapManager(object):
         self.procs['tf_to_map'] = tf_to_map
 
     def stop_tf_publisher(self):
-        self.rs.term_node(self.procs['tf_from_world'])
-        self.rs.term_node(self.procs['tf_to_map'])
+        if 'tf_from_world' in self.procs:
+            self.rs.term_node(self.procs['tf_from_world'])
+        if 'tf_to_map' in self.procs:
+            self.rs.term_node(self.procs['tf_to_map'])
 
 if __name__ == '__main__':
     rospy.init_node('map_manager')
