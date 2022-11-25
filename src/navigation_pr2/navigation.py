@@ -73,6 +73,10 @@ class GetWaypoints(smach.State):
 class GetSpeechinMoving(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted', 'end', 'request interrupt', 'start mapping', 'aborted'])
+        rospy.wait_for_service('/spot_map_server/change_floor')
+        # rospy.wait_for_service('/map_manager/change_floor')
+        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
 
     def execute(self, userdata):
         if not wait_for_speech(timeout=5):
@@ -86,6 +90,11 @@ class GetSpeechinMoving(smach.State):
         rospy.delete_param('~speech_roman')
         if re.findall('matute', speech_roman):
             return 'request interrupt'
+        elif re.findall('kai|tuita', speech_roman):
+            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).groups()[0]
+            self.eus_floor(floor=floor_name)
+            # self.py_floor(command=1, floor=floor_name)
+            return 'aborted'
         return 'aborted'
 
 class CheckGoal(smach.State):

@@ -24,7 +24,7 @@ class Idling(smach.State):
         elif re.findall('konniti', speech_roman):
             return 'intro'
         else:
-            self.speak.parrot(speech_roman)
+            # self.speak.parrot(speech_roman)
             return 'aborted'
 
         return 'start mapping'

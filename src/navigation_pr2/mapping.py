@@ -9,14 +9,38 @@ import romkan
 from std_srvs.srv import Empty
 from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
+from navigation_pr2.srv import ChangeFloor
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted'],
                              output_keys=['new_spot_name', 'new_spot_name_jp'])
         self.speak = client
+        rospy.wait_for_service('/spot_map_server/change_floor')
+        rospy.wait_for_service('/map_manager/change_floor')
+        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+        self.initialized = False
 
     def execute(self, userdata):
+        if not self.initialized:
+            while True:
+                self.speak.say('ここは何階ですか')
+                rospy.loginfo('waiting for floor...')
+                wait_for_speech(timeout = 20)
+                speech_roman = rospy.get_param('~speech_roman')
+                rospy.delete_param('~speech_raw')
+                rospy.delete_param('~speech_roman')
+                if re.findall('kai', speech_roman):
+                    floor_name = re.search(r'(.*)kai.*$', speech_roman).groups()[0]
+                    self.eus_floor(floor=floor_name)
+                    self.py_floor(command=0, floor=floor_name)
+                    break
+                else:
+                    continue
+            self.initialized = True
+            return 'aborted'
+
         if not wait_for_speech(timeout=30):
             return 'timeout'
         speech_raw = rospy.get_param('~speech_raw')
@@ -29,7 +53,13 @@ class WaitForTeaching(smach.State):
             # userdata.new_spot_name_jp = re.search(r'^ここが(.*)だよ$', speech_raw.encode('utf-8')).groups()[0]
             userdata.new_spot_name_jp = romkan.to_hiragana(extracted_name)
             return 'name received'
+        elif re.findall('kai|tuita', speech_roman):
+            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).groups()[0]
+            self.eus_floor(floor=floor_name)
+            self.py_floor(command=1, floor=floor_name)
+            return 'aborted'
         elif re.findall('owari', speech_roman):
+            self.py_floor(command=2, floor=floor_name)
             return 'end'
         elif re.findall('annai', speech_roman):
             return 'request navigation'
@@ -100,5 +130,3 @@ def con_mapping_out_cb(outcome_map):
         return 'succeeded'
     if outcome_map['RECORD_WITH_NAME'] == 'request navigation':
         return 'start navigation'
-    
-
