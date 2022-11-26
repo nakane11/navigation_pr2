@@ -6,7 +6,7 @@ import smach
 import re
 from geometry_msgs.msg import PoseStamped
 from pr2_mechanism_msgs.srv import SwitchController
-from navigation_pr2.srv import Path
+from navigation_pr2.srv import Path, ChangeFloor
 from navigation_pr2.utils import *
 
 class Navigation(smach.State):
