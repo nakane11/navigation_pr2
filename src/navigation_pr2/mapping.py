@@ -13,7 +13,7 @@ from navigation_pr2.srv import ChangeFloor
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted'],
+        smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name', 'new_spot_name_jp'])
         self.speak = client
         rospy.wait_for_service('/spot_map_server/change_floor')
@@ -56,6 +56,8 @@ class WaitForTeaching(smach.State):
             userdata.new_spot_name_jp = romkan.to_hiragana(extracted_name)
             self.speak.say('{}というのですね'.format(romkan.to_hiragana(extracted_name).encode('utf-8')))
             return 'name received'
+        elif re.search(r'.*tigai.*$', speech_roman) is not None:
+            return 'cancelled'
         elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
             floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
             self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
@@ -86,6 +88,18 @@ class SendWithName(smach.State):
         goal.name_jp = name_jp
         self.ac.send_goal(goal)
         return 'send spot with name'
+
+class SendCancelName(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'])
+        self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
+        self.ac.wait_for_server()
+
+    def execute(self, userdata):
+        goal = RecordSpotGoal()
+        goal.command = 2
+        self.ac.send_goal(goal)
+        return 'succeeded'
 
 class SwitchRecordWithoutName(smach.State):
     def __init__(self):

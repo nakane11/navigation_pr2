@@ -42,9 +42,12 @@ class NavigationSmach():
                                                     'name received':'SEND_WITH_NAME',
                                                     'end':'succeeded',
                                                     'request navigation':'request navigation',
-                                                    'aborted':'WAIT_FOR_TEACHING'})
+                                                    'aborted':'WAIT_FOR_TEACHING',
+                                                    'cancelled':'SEND_CANCEL_NAME'})
                 smach.StateMachine.add('SEND_WITH_NAME', SendWithName(),
                                        transitions={'send spot with name':'SET_MAP_AVAILABLE'})
+                smach.StateMachine.add('SEND_CANCEL_NAME', SendCancelName(),
+                                       transitions={'succeeded':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SET_MAP_AVAILABLE', SetMapAvailable(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
 
