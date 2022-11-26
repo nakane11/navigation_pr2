@@ -56,14 +56,14 @@ class RobotService(object):
         except psutil.NoSuchProcess:
             return
         # 子プロセスを再帰的に全て取得
-        children = parent.children(recursive=True)
+        # children = parent.children(recursive=True)
         # 対象プロセスを落とす
         proc.terminate()
         proc.wait()
         # 残っている子プロセスを終了させる
-        for child in children:
-            if child.is_running():
-                child.kill()
+        # for child in children:
+        #     if child.is_running():
+        #         child.kill()
 
     def term_node(self, proc):
         if proc is not None:
@@ -128,7 +128,6 @@ class MapManager(object):
             continue
         rospy.loginfo('Successfully saved {}.yaml!'.format(self.current_floor))
         trans, rot = self.get_robotpose()
-        self.stop_map_saver()
         self.stop_gmapping()
         self.stop_tf_publisher()
         self.start_tf_publisher(floor)
@@ -137,15 +136,18 @@ class MapManager(object):
         self.set_current_floor(floor)
 
     def stop_make_map(self):
+        trans, rot = self.get_robotpose()
         self.start_map_saver(self.current_floor)
         while not os.path.exists('/tmp/raw_maps/{}.yaml'.format(self.current_floor)):
             continue
         rospy.loginfo('Successfully saved {}.yaml!'.format(self.current_floor))
-        self.stop_map_saver() 
         self.stop_gmapping()
-        print(self.current_floor)
         self.start_map_server(self.current_floor)
         self.start_amcl()
+        time.sleep(8)
+        self.set_initialpose(trans, rot)
+        trans, rot = self.get_robotpose()
+        print(trans, rot)
 
     def change_floor(self, floor):
         trans, rot = self.get_robotpose()
@@ -183,7 +185,8 @@ class MapManager(object):
         package = 'gmapping'
         executable = 'slam_gmapping'
         name = 'slam_gmapping_{}'.format(floor)
-        args=['_odom_frame:=odom_combined', '_map_frame:=/map']
+        args=['_odom_frame:=odom_combined', '_map_frame:=/map',
+              '_xmin:=-50.0', '_ymin:=-50.0', '_xmax:=50.0', '_ymax:=50.0']
         remap_args = {'scan':'base_scan'}
         gmapping = self.rs.launch_node(package, executable, name, args=args, remap=remap_args)
         self.procs['gmapping'] = gmapping
@@ -198,7 +201,7 @@ class MapManager(object):
         executable = 'map_saver'
         name = 'map_saver_{}'.format(floor)
         args=['-f', '/tmp/raw_maps/{}'.format(floor)]
-        saver = self.rs.launch_node(package, executable, name, args=args)
+        saver = self.rs.launch_node(package, executable, name, args=args, wait=False)
         self.procs['saver'] = saver
 
     def stop_map_saver(self):
