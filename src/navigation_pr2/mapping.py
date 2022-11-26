@@ -20,6 +20,7 @@ class WaitForTeaching(smach.State):
         rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+        self.py_floor(command=0, floor='empty')
         self.initialized = False
 
     def execute(self, userdata):
@@ -27,15 +28,17 @@ class WaitForTeaching(smach.State):
             while True:
                 self.speak.say('ここは何階ですか')
                 rospy.loginfo('waiting for floor...')
-                wait_for_speech(timeout = 20)
-                speech_roman = rospy.get_param('~speech_roman')
-                rospy.delete_param('~speech_raw')
-                rospy.delete_param('~speech_roman')
-                if re.findall('kai', speech_roman):
-                    floor_name = re.search(r'(.*)kai.*$', speech_roman).groups()[0]
-                    self.eus_floor(floor=floor_name)
-                    self.py_floor(command=0, floor=floor_name)
-                    break
+                if wait_for_speech(timeout=20):
+                    speech_roman = rospy.get_param('~speech_roman')
+                    rospy.delete_param('~speech_raw')
+                    rospy.delete_param('~speech_roman')
+                    if re.findall('kai', speech_roman):
+                    if re.search(r'(.*)kai.*$', speech_roman) is not None:
+                        floor_name = re.search(r'(.*)kai.*$', speech_roman).group(1)
+                        self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
+                        self.eus_floor(floor=floor_name)
+                        self.py_floor(command=1, floor=floor_name)
+                        break
                 else:
                     continue
             self.initialized = True
@@ -47,14 +50,15 @@ class WaitForTeaching(smach.State):
         speech_roman = rospy.get_param('~speech_roman')
         rospy.delete_param('~speech_raw')
         rospy.delete_param('~speech_roman')
-        if re.findall('kokoga|dayo', speech_roman):
-            extracted_name = re.search(r'^kokoga(.*)dayo$', speech_roman).groups()[0]
+        if re.search(r'.*kokoga(.*)dayo$', speech_roman) is not None:
+            extracted_name = re.search(r'^kokoga(.*)dayo$', speech_roman).group(1)
             userdata.new_spot_name = extracted_name
-            # userdata.new_spot_name_jp = re.search(r'^ここが(.*)だよ$', speech_raw.encode('utf-8')).groups()[0]
             userdata.new_spot_name_jp = romkan.to_hiragana(extracted_name)
+            self.speak.say('{}というのですね'.format(romkan.to_hiragana(extracted_name).encode('utf-8')))
             return 'name received'
-        elif re.findall('kai|tuita', speech_roman):
-            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).groups()[0]
+        elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
+            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
+            self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
             self.eus_floor(floor=floor_name)
             self.py_floor(command=1, floor=floor_name)
             return 'aborted'
@@ -63,9 +67,8 @@ class WaitForTeaching(smach.State):
             return 'end'
         elif re.findall('annai', speech_roman):
             return 'request navigation'
-        else:
-            self.speak.parrot(speech_roman)
-            return 'aborted'
+        self.speak.parrot(speech_roman)
+        return 'aborted'
 
 class SendWithName(smach.State):
     def __init__(self):

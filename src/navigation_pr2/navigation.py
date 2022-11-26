@@ -90,10 +90,11 @@ class GetSpeechinMoving(smach.State):
         rospy.delete_param('~speech_roman')
         if re.findall('matute', speech_roman):
             return 'request interrupt'
-        elif re.findall('kai|tuita', speech_roman):
-            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).groups()[0]
+        elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
+            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
+            self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
             self.eus_floor(floor=floor_name)
-            # self.py_floor(command=1, floor=floor_name)
+            self.py_floor(command=1, floor=floor_name)
             return 'aborted'
         return 'aborted'
 
