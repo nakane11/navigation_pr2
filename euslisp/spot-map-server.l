@@ -146,6 +146,9 @@
               )
 
   (:add-spot (coords &optional (name nil))
+             (when (null coords)
+               (ros::ros-info "Cannot get current coords.")
+               (return-from :add-spot nil))
              (unless (or (null prev-spot) (null name))
                (when (< (abs (coords-difference coords (send prev-spot :get :coords))) 0.25)
                  (unless (send prev-spot :get :name-jp)
