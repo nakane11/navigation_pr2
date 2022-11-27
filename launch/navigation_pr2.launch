@@ -18,5 +18,21 @@
     <param name="robot" value="pr2"/>
   </node>
   
+  <node name="republish_conversation"
+        pkg="navigation_pr2" type="republish_conversation.py"
+        output="screen"
+        clear_params="true" >
+    <remap from="~input1" to="/Tablet/voice" />
+    <remap from="~input2" to="/robotsound_jp/goal" />
+    <rosparam>
+      number_of_input: 2
+      input1_transform: "m.transcript[0]"
+      input1_color: "red"
+      input1_speaker: "people"
+      input2_transform: "m.goal.sound_request.arg"
+      input2_color: "white"
+      input2_speaker: "PR2"
+    </rosparam>
+  </node>
 
 </launch>

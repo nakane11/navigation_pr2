@@ -25,18 +25,21 @@ class RepublishConversation(object):
 
         self.subs = {}
         self.colors = {}
+        self.speakers = {}
         self.transform_fns = {}
         for i in range(self.n_input):
             topic_name = '~input{}'.format(i + 1)
             color = rospy.get_param('{}_color'.format(topic_name), 'white')
+            speaker = rospy.get_param('{}_speaker'.format(topic_name), None)
             transform_expression = rospy.get_param('{}_transform'.format(topic_name), 'm')
             topic_name = rospy.resolve_name(topic_name)
             self.colors[topic_name] = color
+            self.speakers[topic_name] = speaker
             self.transform_fns[topic_name] = expr_eval(transform_expression)
             sub = rospy.Subscriber(
                 topic_name,
                 rospy.AnyMsg,
-                callback=lambda msg, tn=topic_name: self.callback(tn, msg),                
+                callback=lambda msg, tn=topic_name: self.callback(tn, msg),
                 queue_size=1)
             self.subs[topic_name] = sub
 
@@ -80,6 +83,9 @@ class RepublishConversation(object):
 
     def colored_message(self, topic_name, text):
         cmsg = text.decode('utf-8')
+        speaker = self.speakers[topic_name]
+        if speaker is not None:
+            cmsg = speaker + ': ' + cmsg
         color = self.colors[topic_name]
         return '<span style="color: {};">%s</span>'.format(color) % cmsg
 
