@@ -26,16 +26,15 @@ class WaitForTeaching(smach.State):
     def execute(self, userdata):
         if not self.initialized:
             while True:
-                self.speak.say('ここは何階ですか')
+                self.speak.say('ここは何階ですか?')
                 rospy.loginfo('waiting for floor...')
                 if wait_for_speech(timeout=20):
                     speech_roman = rospy.get_param('~speech_roman')
                     rospy.delete_param('~speech_raw')
                     rospy.delete_param('~speech_roman')
-                    if re.findall('kai', speech_roman):
                     if re.search(r'(.*)kai.*$', speech_roman) is not None:
                         floor_name = re.search(r'(.*)kai.*$', speech_roman).group(1)
-                        self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
+                        self.speak.say('{}階ですね。ありがとうございます'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
                         self.eus_floor(floor=floor_name)
                         self.py_floor(command=1, floor=floor_name)
                         break
@@ -57,10 +56,11 @@ class WaitForTeaching(smach.State):
             self.speak.say('{}というのですね'.format(romkan.to_hiragana(extracted_name).encode('utf-8')))
             return 'name received'
         elif re.search(r'.*tigai.*$', speech_roman) is not None:
+            self.speak.say('失礼しました')
             return 'cancelled'
         elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
             floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
-            self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
+            self.speak.say('{}階ですね。ちょっと待ってください'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
             self.eus_floor(floor=floor_name)
             self.py_floor(command=1, floor=floor_name)
             return 'aborted'
