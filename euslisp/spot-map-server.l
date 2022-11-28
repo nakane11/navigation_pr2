@@ -40,7 +40,10 @@
   (:change-floor (req)
                  (let* (spots (stamp (ros::time-now)) (header (instance std_msgs::header :init :stamp stamp :frame_id "/world")))
                    (dolist (i (send spot-graph :nodes))
-                     (push (cons (send i :name) (send i :get :coords)) spots))
+                     (if (send i :get :name-jp)
+                         (push (list (send i :name) (send i :get :coords) nil) spots)
+                       (push (list (send i :name) (send i :get :coords) #f(0.2 0.2 0.2)) spots)
+                       ))
                    (publish-pin-marker-array spots header :action 2)
                    (publish-arcs-marker-array (send spot-graph :nodes) header :action 2))
 
@@ -58,6 +61,7 @@
                      (setq spot-graph (instance graph :init)))
                    (when next-graph
                      (setq spot-graph next-graph))
+                   (setq prev-spot nil)
                    (setq current-floor floor)
                    res
                    ))
@@ -230,7 +234,10 @@
     ;; markerをpublishする
     (let* (spots (stamp (ros::time-now)) (header (instance std_msgs::header :init :stamp stamp :frame_id "/world")))
       (dolist (i (send spot-graph :nodes))
-        (push (cons (send i :name) (send i :get :coords)) spots))
+        (if (send i :get :name-jp)
+            (push (list (send i :name) (send i :get :coords) nil) spots)
+            (push (list (send i :name) (send i :get :coords) #f(0.2 0.2 0.2)) spots)
+          ))
       (publish-pin-marker-array spots header)
       (publish-arcs-marker-array (send spot-graph :nodes) header))
     )
