@@ -54,6 +54,8 @@ class RobotService(object):
         return proc_app
 
     def kill_process(self, proc):
+        if not proc:
+            return
         try:
             if proc.pid:
                 parent = psutil.Process(proc.pid)
@@ -155,8 +157,6 @@ class MapManager(object):
         self.start_amcl()
         time.sleep(8)
         self.publish_initialpose(trans, rot)
-        trans, rot = self.get_robotpose()
-        print(trans, rot)
 
     def change_floor(self, floor):
         trans, rot = self.get_robotpose()
@@ -248,7 +248,7 @@ class MapManager(object):
         package = 'multirobot_map_merge'
         executable = 'map_merge'
         name = 'map_merge_{}'.format(floor)
-        args=['_merged_map_topic:=/map', 'known_init_poses:=true']
+        args=['_merged_map_topic:=/map', '_known_init_poses:=true', '_world_frame:=map']
         multirobot_map_merge = self.rs.launch_node(package, executable, name, args=args)
         self.procs['multirobot_map_merge'] = multirobot_map_merge
         for yaml in glob.glob('/tmp/raw_maps/{}_*.yaml'.format(floor)):
