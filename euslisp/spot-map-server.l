@@ -38,6 +38,12 @@
     (ros::ros-info "init ended"))
 
   (:change-floor (req)
+                 (let* (spots (stamp (ros::time-now)) (header (instance std_msgs::header :init :stamp stamp :frame_id "/world")))
+                   (dolist (i (send spot-graph :nodes))
+                     (push (cons (send i :name) (send i :get :coords)) spots))
+                   (publish-pin-marker-array spots header :action 2)
+                   (publish-arcs-marker-array (send spot-graph :nodes) header :action 2))
+
                  (let (res)
                    (setq res (send req :response))
                    (setq floor (send req :floor))
@@ -211,7 +217,7 @@
       (setq curr-coords (send *ri* :state :worldcoords))
       (when (null prev-spot)
         (send self :add-spot curr-coords))
-      (unless (null prev-spot)
+      (unless (or (null curr-coords) (null prev-spot))
         (setq prev-coords (send prev-spot :get :coords))
         (setq prev-v (send  prev-coords :rotate-vector #f(1 0 0)))
         (setq curr-v (send curr-coords :rotate-vector #f(1 0 0)))
