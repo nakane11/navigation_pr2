@@ -113,13 +113,18 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
-catkin_generate_virtualenv(
-  INPUT_REQUIREMENTS requirements.in
-  PYTHON_INTERPRETER python3
-  USE_SYSTEM_PACKAGES TRUE
-  ISOLATE_REQUIREMENTS FALSE
-  CHECK_VENV FALSE
+if($ENV{ROS_DISTRO} STREQUAL "noetic")
+  catkin_generate_virtualenv(
+    INPUT_REQUIREMENTS requirements.in
+    PYTHON_INTERPRETER python3.5
   )
+else()
+  catkin_generate_virtualenv(
+    PYTHON_VERSION 3.5
+    USE_SYSTEM_PACKAGES TRUE
+    ISOLATE_REQUIREMENTS FALSE
+  )
+endif()
 
 file(GLOB NODE_SCRIPTS_FILES node_scripts/*.py)
 catkin_install_python(
