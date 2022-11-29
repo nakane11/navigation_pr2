@@ -25,6 +25,8 @@ class RobotService(object):
     def __init__(self):
         self.name = 'robot_service'
         self.master = rosgraph.Master(self.name)
+        self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        os.mkdir(self.dir_path)
 
     def launch_node(self, pkg, node, node_name, args=[], remap={}, timeout=15.0, polling=1.0, wait=True):
         rospy.loginfo("Start running {}".format(node_name))
@@ -218,7 +220,7 @@ class MapManager(object):
         package = 'map_server'
         executable = 'map_saver'
         name = 'map_saver_{}'.format(floor)
-        filename = '/tmp/raw_maps/{}_{}'.format(floor, datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        filename = '{}/{}_{}'.format(self.dir_path, floor, datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
         # args=['-f', '/tmp/raw_maps/{}'.format(floor)]
         args=['-f', filename]
         saver = self.rs.launch_node(package, executable, name, args=args, wait=False)
@@ -251,14 +253,14 @@ class MapManager(object):
         args=['_merged_map_topic:=/map', '_known_init_poses:=true', '_world_frame:=map']
         multirobot_map_merge = self.rs.launch_node(package, executable, name, args=args)
         self.procs['multirobot_map_merge'] = multirobot_map_merge
-        for yaml in glob.glob('/tmp/raw_maps/{}_*.yaml'.format(floor)):
+        for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
             fname = os.path.basename(os.path.splitext(yaml)[0])
             self.start_child_map_server(floor, fname, trans, rot)
 
     def stop_multirobot_map_merge(self, floor):
         if 'multirobot_map_merge' in self.procs:
             self.rs.term_node(self.procs['multirobot_map_merge'])
-        for yaml in glob.glob('/tmp/raw_maps/{}_*.yaml'.format(floor)):
+        for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
             fname = os.path.splitext(yaml)[0]
 
             self.stop_child_map_server(fname)
@@ -268,7 +270,7 @@ class MapManager(object):
         package = 'map_server'
         executable = 'map_server'
         name = 'map_server_{}'.format(fname)
-        args=['/tmp/raw_maps/{}.yaml'.format(fname), 'map:=/{}/{}/map'.format(floor, fname)]
+        args=['{}/{}.yaml'.format(self.dir_path, fname), 'map:=/{}/{}/map'.format(floor, fname)]
         server = self.rs.launch_node(package, executable, name, args=args)
         self.procs['{}'.format(fname)] = server
 
