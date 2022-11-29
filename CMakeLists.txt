@@ -8,11 +8,12 @@ project(navigation_pr2)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  catkin_virtualenv
+  message_generation
   roscpp
   roseus
   rospy
   std_msgs
-  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -111,6 +112,28 @@ catkin_package(
 #  CATKIN_DEPENDS roscpp roseus rospy std_msgs
 #  DEPENDS system_lib
 )
+
+catkin_generate_virtualenv(
+  INPUT_REQUIREMENTS requirements.in
+  PYTHON_INTERPRETER python3
+  USE_SYSTEM_PACKAGES TRUE
+  ISOLATE_REQUIREMENTS FALSE
+  CHECK_VENV FALSE
+  )
+
+file(GLOB NODE_SCRIPTS_FILES node_scripts/*.py)
+catkin_install_python(
+  PROGRAMS ${NODE_SCRIPTS_FILES}
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/node_scripts/)
+
+file(GLOB NODE_SCRIPTS_FILES src/navigation_pr2/*.py)
+catkin_install_python(
+  PROGRAMS ${NODE_SCRIPTS_FILES}
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/src/${PROJECT_NAME})
+install(FILES requirements.txt
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
 
 ###########
 ## Build ##
