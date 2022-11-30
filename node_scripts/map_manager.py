@@ -25,8 +25,6 @@ class RobotService(object):
     def __init__(self):
         self.name = 'robot_service'
         self.master = rosgraph.Master(self.name)
-        self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        os.mkdir(self.dir_path)
 
     def launch_node(self, pkg, node, node_name, args=[], remap={}, timeout=15.0, polling=1.0, wait=True):
         rospy.loginfo("Start running {}".format(node_name))
@@ -93,6 +91,8 @@ class RobotService(object):
 class MapManager(object):
     
     def __init__(self):
+        self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        os.mkdir(self.dir_path)
         self.rs = RobotService()
         self.procs = {}
         self.current_floor = None
