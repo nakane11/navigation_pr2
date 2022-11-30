@@ -21,17 +21,25 @@ class WaitforHandImpact(smach.State):
         self.count = 0
         
     def execute(self, userdata):
+        rospy.sleep(10)
         goal = PR2GripperEventDetectorGoal()
         goal.command.trigger_conditions = pr2_gripper_sensor_msgs.msg.PR2GripperEventDetectorCommand.ACC
         goal.command.acceleration_trigger_magnitude = 12.0
         self.ac.send_goal(goal)
         if self.ac.wait_for_result(timeout=rospy.Duration(8)):
             ret = self.ac.get_result()
-            self.count += 1
-            if self.count > 1:
-                return 'succeeded'
+            if ret.data.acceleration_event is True:
+                self.count += 1
+                if self.count > 1:
+                    return 'succeeded'
+                else:
+                    return 'detected'
+            elif self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'
             else:
-                return 'detected'
+                self.count = 0
+                return 'aborted'
         elif self.preempt_requested():
             self.service_preempt()
             return 'preempted'
