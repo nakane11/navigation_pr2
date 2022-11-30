@@ -35,7 +35,7 @@
 
 (defun hand-pose-subscriber ()
   (send *pr2* :head :angle-vector #f(0.0 14.694))
-  (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
+  (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :head-controller)
   (setq hand-pose-array (one-shot-subscribe "/hand_pose_estimation_2d/output/pose" jsk_recognition_msgs::HandPoseArray))
   (when (> (length (send hand-pose-array :poses)) 0)
     (setq hand-pose (car (send hand-pose-array :poses)))
@@ -57,7 +57,9 @@
            (> (elt (send hand-coords :pos) 2) 1500))
   (ros::spin-once)           
   (ros::ros-info "cb")
-  (setq hand-coords (hand-pose-subscriber)))
+  (setq hand-coords (hand-pose-subscriber))
+  (when hand-coords
+    (ros::ros-info "~A" hand-coords)))
 (setq end (ros::time-now))
 (ros::ros-info (format nil "time: ~A" (send (ros::time- end start) :to-sec)))
 (give-hand-pose hand-coords)
