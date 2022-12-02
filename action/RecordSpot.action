@@ -6,7 +6,6 @@ uint8 REMOVE = 2
 uint8 command
 # float32 radius
 string name
-string name_jp
 ---
 bool result
 # string[] other_name

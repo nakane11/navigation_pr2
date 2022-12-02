@@ -7,7 +7,6 @@ import rospy
 import actionlib
 from std_srvs.srv import Empty
 from navigation_pr2.utils import *
-from navigation_pr2.kks_client import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from navigation_pr2.srv import ChangeFloor
 
@@ -78,15 +77,13 @@ class SendWithName(smach.State):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
         self.ac.wait_for_server()
-        self.kks = KKSClient()
 
     def execute(self, userdata):
         name = userdata.new_spot_name
         rospy.loginfo("add new spot: {}".format(name))
         goal = RecordSpotGoal()
         goal.command = 1
-        goal.name_jp = name
-        goal.name = self.kks.do(name.decode('utf-8'))
+        goal.name = name
         self.ac.send_goal(goal)
         return 'send spot with name'
 

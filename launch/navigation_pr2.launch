@@ -13,11 +13,17 @@
     </node>
   </group>
 
-  <node pkg="roseus" type="roseus" name="spot_map_server" output="screen"
-        args="$(find navigation_pr2)/euslisp/spot-map-server.l" >
-    <param name="robot" value="pr2"/>
+  <!-- <node pkg="roseus" type="roseus" name="spot_map_server" output="screen" -->
+  <!--       args="$(find navigation_pr2)/euslisp/spot-map-server.l" > -->
+  <!--   <param name="robot" value="pr2"/> -->
+  <!-- </node> -->
+
+  <node name="spot_map_erver"
+        pkg="navigation_pr2" type="spot_map_server.py"
+        output="screen"
+        clear_params="true" >
   </node>
-  
+
   <node name="republish_conversation"
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen"
@@ -38,4 +44,12 @@
     </rosparam>
   </node>
 
+  <node name="republish_marker_array"
+        pkg="navigation_pr2" type="republish_marker_array.py"
+        output="screen"
+        clear_params="true" >
+    <remap from="~input" to="/spot_map_server/nodes" />
+    <remap from="~output" to="/spot_map_server/nodes_republish" />
+  </node>
+  
 </launch>

@@ -93,9 +93,9 @@ class SpotMapServer(object):
         elif goal.command == 1:
             pose = self.get_robotpose()
             if pose:
-                self.add_spot(pose, (goal.name, goal.name_jp))
+                self.add_spot(pose, goal.name)
         elif goal.command == 2:
-            self.remove_spot(goal.name_jp)
+            self.remove_spot(name)
         
         result = RecordSpotResult()
         self.add.set_succeeded(result)
@@ -134,10 +134,10 @@ class SpotMapServer(object):
                 prev_pose = prev_node['pose']
                 diff = compute_difference_between_poses(pose, prev_pose)
                 if diff < 0.25:
-                    node_name = name[0]
+                    node_name = name
                     mapping = {self.current_node: node_name}
                     self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
-                    self.active_graph.nodes[node_name]['name'] = name[1]
+                    self.active_graph.nodes[node_name]['name'] = True
                     rospy.loginfo('Replace {} to {}'.format(self.current_node, node_name))
                     self.current_node = node_name
                     return
@@ -155,7 +155,7 @@ class SpotMapServer(object):
                         node_name = name[0]
                         mapping = {i: node_name}
                         self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
-                        self.active_graph.nodes[node_name]['name'] = name[1]
+                        self.active_graph.nodes[node_name]['name'] = True
                         rospy.loginfo('Replace {} to {}'.format(self.current_node, node_name))
                         self.current_node = node_name
                     return
@@ -164,12 +164,12 @@ class SpotMapServer(object):
             node_name = str(self.label)
             self.label += 1
         else:
-            node_name = name[0]
+            node_name = name
         self.active_graph.add_node(node_name)
         rospy.loginfo('Add node {}'.format(node_name))
         self.active_graph.nodes[node_name]['pose'] = pose
         if name:
-            self.active_graph.nodes[node_name]['name'] = name[1]
+            self.active_graph.nodes[node_name]['name'] = True
         # range, action, description
         if self.current_node:
             self.active_graph.add_edge(node_name, self.current_node)
@@ -186,14 +186,14 @@ class SpotMapServer(object):
         if graph_name:
             target_graph = self.graph_dict[graph_name]
             for n in list(target_graph.nodes):
-                if target_graph.nodes[n]['name'] == name:
+                if n == name:
                     target_graph.remove_node(n)
                     rospy.loginfo('Remove node {}'.format(n))
             self.graph_dict[graph_name] = target_graph
         else:
             target_graph = self.active_graph
             for n in list(target_graph.nodes):
-                if target_graph.nodes[n]['name'] == name:
+                if n == name:
                     target_graph.remove_node(n)
                     rospy.loginfo('Remove node {}'.format(n))
             self.active_graph = target_graph
