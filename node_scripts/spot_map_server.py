@@ -102,14 +102,47 @@ class SpotMapServer(object):
         return
 
     def change_floor_cb(self, req):
-        self.change_graph(self, req.floor)
+        print(req.floor)
+        self.change_graph(req.floor)
         self.publish_markers(action=2)
         resp = ChangeFloorResponse()
         return resp
 
     def find_path_cb(self, req):
-        resp = PathResponse()
-        return resp
+        goal = req.goal_name
+        goal_graph = None
+        goal_floor = None
+        resp = PathResponse(result=0)
+
+        # ゴールがあるgraphを探索
+        for name, graph in self.graph_dict.items():
+            if goal in list(graph.nodes):
+                goal_graph = graph
+                goal_floor = name
+                break
+        if goal_graph is None:
+            if goal in list(self.active_graph.nodes):
+                goal_graph = self.active_graph
+                goal_floor = self.active_graph_name
+        if goal_graph is None:
+            resp.result = 1
+            return resp
+        try:
+            #同じ階(エレベータを使わない)
+            if self.active_graph_name == goal_floor:
+                path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
+            #現在と違う階の場合
+            else:
+                path_list_target_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator)
+                path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator)
+        except Excetion as e:
+            rospy.loginfo(e)
+            resp.result = 2
+            return resp
+        # for i in path_list_target_floor:
+        #     pose = self.active_graph.nodes[i]['pose']
+
+
 
     def get_robotpose(self):
         try:
@@ -201,11 +234,14 @@ class SpotMapServer(object):
         
     def change_graph(self, name):
         self.graph_dict[self.active_graph_name] = self.active_graph
+        rospy.loginfo('Change graph from {} to {}'.format(self.active_graph_name, name))
+
         if name in self.graph_dict:
             self.active_graph = self.graph_dict[name]
         else:
             self.active_graph = nx.MultiGraph()
         self.active_graph_name = name
+        rospy.loginfo('nodes: {}'.format(list(self.active_graph.nodes)))
 
 
 if __name__ == '__main__':
