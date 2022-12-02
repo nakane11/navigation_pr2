@@ -61,9 +61,9 @@ class AskWhat(smach.State):
         if not wait_for_speech(timeout=10):
             self.speak.say('何でもありません')
             return 'timeout'
-        speech_roman = rospy.get_param('~speech_roman')
-        rospy.delete_param('~speech_roman')
-        if re.findall('toma', speech_roman):
+        speech_raw = rospy.get_param('~speech_raw')
+        rospy.delete_param('~speech_raw')
+        if re.findall('待って', speech_raw):
             return 'interrupt'
         return 'preeempted'
 

@@ -125,9 +125,9 @@
     </node>
   </group>
 
-  <node name="speech_to_roman" pkg="navigation_pr2" type="speech_to_roman.py"
-        respawn="true">
-    <remap from="~input" to="/Tablet/voice" />
-  </node>
+  <!-- <node name="speech_to_roman" pkg="navigation_pr2" type="speech_to_roman.py" -->
+  <!--       respawn="true"> -->
+  <!--   <remap from="~input" to="/Tablet/voice" /> -->
+  <!-- </node> -->
 
 </launch>

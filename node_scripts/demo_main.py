@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
@@ -14,27 +15,24 @@ from speech_recognition_msgs.msg import SpeechRecognitionCandidates
 class NavigationSmach():
     def __init__(self):
         rospy.init_node('navigation_state_machine')
-        self.speech_sub = rospy.Subscriber('/speech_to_roman/output', SpeechRecognitionCandidates, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice', SpeechRecognitionCandidates, self.speech_cb)
         self.speak = SpeakClient()
 
     def speech_cb(self, msg):
         rospy.set_param('~speech_raw', msg.transcript[0])
-        rospy.set_param('~speech_roman', msg.transcript[1])
 
     def smach(self):
         ###################################
         ############  MAPPING  ############
         ###################################
         con_mapping = smach.Concurrence(outcomes=['outcome', 'succeeded', 'start navigation'],
-                                        output_keys=['map_available'],
                                         default_outcome='outcome', 
                                         child_termination_cb = con_mapping_child_term_cb,
                                         outcome_cb=con_mapping_out_cb)
 
         with con_mapping:
             
-            sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation'],
-                                                     output_keys=['map_available'])
+            sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation'])
             
             with sm_record_with_name:
                 smach.StateMachine.add('WAIT_FOR_TEACHING', WaitForTeaching(client=self.speak),
@@ -45,12 +43,9 @@ class NavigationSmach():
                                                     'aborted':'WAIT_FOR_TEACHING',
                                                     'cancelled':'SEND_CANCEL_NAME'})
                 smach.StateMachine.add('SEND_WITH_NAME', SendWithName(),
-                                       transitions={'send spot with name':'SET_MAP_AVAILABLE'})
+                                       transitions={'send spot with name':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SEND_CANCEL_NAME', SendCancelName(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
-                smach.StateMachine.add('SET_MAP_AVAILABLE', SetMapAvailable(),
-                                       transitions={'succeeded':'WAIT_FOR_TEACHING'})
-
                 smach.StateMachine.add('EXPLAIN', ExplainMapping(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
             
@@ -61,11 +56,11 @@ class NavigationSmach():
         ###########  NAVIGATION  ##########
         ###################################
 
-        sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'],
-                                           input_keys=['map_available', 'goal_spot'])
+        sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'])
         with sm_navigation:
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping'],
+                                           input_keys=['waypoints', 'next_point'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
                                            outcome_cb=con_moving_out_cb)
@@ -79,11 +74,13 @@ class NavigationSmach():
                                                         'request interrupt':'interrupt',
                                                         'start mapping':'start mapping',
                                                         'aborted':'GET_SPEECH_IN_MOVING'})
-                sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted'])
+                sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted'],
+                                                      input_keys=['waypoints', 'next_point'])
                 with sm_send_waypoint:
                     smach.StateMachine.add('CHECK_GOAL', CheckGoal(),
                                            transitions={'succeeded':'succeeded',
-                                                        'unreached':'CHECK_ELEVATOR'})
+                                                        'unreached':'CHECK_ELEVATOR',
+                                                        'aborted':'aborted'})
                     smach.StateMachine.add('CHECK_ELEVATOR', CheckElevator(),
                                            transitions={'use':'MOVE_TO_ELEVATOR',
                                                         'not use':'SEND_MOVE_TO',
@@ -107,9 +104,6 @@ class NavigationSmach():
                 smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
 
-            # smach.StateMachine.add('CHECK_IF_NAVIGATION_AVAILABLE', CheckIfNavigationAvailable(),
-            #                        transitions={'true':'GET_WAYPOINTS',
-            #                                     'false':'aborted'})
             smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
                                    transitions={'succeeded':'GET_WAYPOINTS',
                                                 'aborted':'aborted'})
@@ -147,8 +141,10 @@ class NavigationSmach():
             smach.StateMachine.add('EXPLAIN', Explain(client=self.speak),
                                    transitions={'succeeded':'IDLING'})
             smach.StateMachine.add('INTRODUCTION', Introduction(client=self.speak),
-                                   transitions={'succeeded':'EXPLAIN'})
-            smach.StateMachine.add('IDLING', Idling(),
+                                   transitions={'succeeded':'EXPLAIN',
+                                                'timeout':'IDLING',
+                                                'aborted':'INTRODUCTION'})
+            smach.StateMachine.add('IDLING', Idling(client=self.speak),
                                    transitions={'timeout':'EXPLAIN',
                                                 'start navigation':'NAVIGATION',
                                                 'start mapping':'MAPPING',

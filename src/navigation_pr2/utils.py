@@ -16,7 +16,7 @@ colors = labelcolormap(N=N) / 255.0
 
 def wait_for_speech(timeout=0):
     start_time = rospy.Time.now()
-    while not rospy.has_param('~speech_roman'):
+    while not (rospy.has_param('~speech_raw')):
         if timeout > 0:
             if (rospy.Time.now() - start_time).to_sec() > timeout:
                 return False
@@ -138,7 +138,7 @@ def make_text(string,
 
 def make_line(pose1=[0.0, 0.0, 0.0],
               pose2=[0.0, 0.0, 0.0],
-              scale=0.01,
+              scale=0.005,
               color=(0.0, 0.0, 0.0, 1.0),
               lifetime=25,
               id=0,
@@ -182,6 +182,8 @@ def make_pin_marker(name, pose, id, stamp, height = 1.8, radius= 0.1, color=None
     return [cyl, cub, txt]
 
 def make_line_marker(pose1, pose2, id, stamp, color=None, alpha=0.7, lifetime=15, frame_id='/map'):
+    print(pose1)
+    print(pose2)
     if color is None:
         color = colors[id % N]
     line = make_line([pose1.position.x, pose1.position.y, pose1.position.z],

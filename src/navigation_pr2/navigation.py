@@ -34,14 +34,12 @@ class SetGoal(smach.State):
         self.speak = client
 
     def execute(self, userdata):
-        self.speak.say('どこへ案内しますか')
+        self.speak.say('どちらへ案内しますか')
         if not wait_for_speech(timeout=30):
             return 'aborted'
         speech_raw = rospy.get_param('~speech_raw')
-        speech_roman = rospy.get_param('~speech_roman')
         rospy.delete_param('~speech_raw')
-        rospy.delete_param('~speech_roman')
-        userdata.goal_spot = speech_roman
+        userdata.goal_spot = speech_raw
         self.speak.say('{}ですね'.format(speech_raw.encode('utf-8')))
         return 'succeeded'
 
@@ -49,7 +47,7 @@ class GetWaypoints(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['ready to move', 'no path found'],
                              input_keys=['goal_spot'],
-                             output_keys=['waypoints'])
+                             output_keys=['waypoints', 'next_point'])
         self.poses = []
         self.speak = client
         self.waypoints_sub = rospy.Subscriber('/spot_map_server/poses', PoseStamped, self.waypoints_cb)
@@ -62,9 +60,11 @@ class GetWaypoints(smach.State):
     def execute(self, userdata):
         goal_name = userdata.goal_spot
         self.poses = []
+        self.speak.say('経路を探します。')
         ret = self.call(goal_name=goal_name)
         if ret.result:
             userdata.waypoints = self.poses
+            userdata.next_point = -1
             return 'ready to move'
         else:
             self.speak.say('すみません。案内できません。')
@@ -85,14 +85,12 @@ class GetSpeechinMoving(smach.State):
                 return 'preempted'
             return 'aborted'
         speech_raw = rospy.get_param('~speech_raw')
-        speech_roman = rospy.get_param('~speech_roman')
         rospy.delete_param('~speech_raw')
-        rospy.delete_param('~speech_roman')
-        if re.findall('matute', speech_roman):
+        if re.search(r'^.*待って.*$', speech_raw) is not None:
             return 'request interrupt'
-        elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
-            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
-            self.speak.say('{}階ですね'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
+        elif re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+            floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
+            self.speak.say('{}階ですね'.format(floor_name))
             self.eus_floor(floor=floor_name)
             self.py_floor(command=1, floor=floor_name)
             return 'aborted'
@@ -100,14 +98,23 @@ class GetSpeechinMoving(smach.State):
 
 class CheckGoal(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'unreached', 'preempted'],
+        smach.State.__init__(self, outcomes=['succeeded', 'unreached', 'preempted', 'aborted'],
+                             input_keys=['waypoints', 'next_point'],
                              output_keys=['next_point'])
 
     def execute(self, userdata):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
-        rospy.sleep(5)
+        next_point = userdata['next_point']
+        waypoints = userdata['waypoints']
+        if next_point > -1:
+            pass
+            # if waypoints[next_point] is close to goal
+            # return 'succeeded'
+        userdata.next_point = next_point + 1
+        if len(waypoints) <= next_point + 1:
+            return 'aborted'
         return 'unreached'
 
 class CheckElevator(smach.State):
@@ -120,7 +127,6 @@ class CheckElevator(smach.State):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
-        rospy.sleep(5)
         return 'use'
 
 class MoveToElevator(smach.State):
@@ -132,19 +138,21 @@ class MoveToElevator(smach.State):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
-        rospy.sleep(5)
         return 'succeeded'
 
 class SendMoveTo(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
-                             input_keys=['next_point'])
+                             input_keys=['next_point', 'waypoints'])
+        self.pub = rospy.Publisher("move_base_simple/goal", PoseStamped, queue_size=1);
 
     def execute(self, userdata):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
-        rospy.sleep(5)
+        waypoints = userdata['waypoints']
+        index = userdata['next_point']
+        goal = waypoints[index]
         return 'succeeded'
 
 class Interrupt(smach.State):
@@ -158,10 +166,8 @@ class Interrupt(smach.State):
                 return 'preempted'
             return 'aborted'
         speech_raw = rospy.get_param('~speech_raw')
-        speech_roman = rospy.get_param('~speech_roman')
         rospy.delete_param('~speech_raw')
-        rospy.delete_param('~speech_roman')
-        if re.findall('saikai', speech_roman):
+        if re.findall('再開', speech_raw):
             return 'resume'
         return 'aborted'
 
@@ -187,6 +193,8 @@ class StartNavigation(smach.State):
         self.speak.say('手を繋いで下さい')
         # 手繋ぎ
         ret = self.controller([], ['l_arm_controller'], None)
+        print(ret)
+        self.speak.say('案内を開始します')
         return 'succeeded'
 
 def con_moving_child_term_cb(outcome_map):
@@ -208,8 +216,8 @@ def con_moving_out_cb(outcome_map):
         return 'succeeded'
     if outcome_map['TALK_IN_MOVING'] == 'interrupt':
         return 'interrupt'
-    # if outcome_map['SEND_WAYPOINT'] == 'aborted':
-    #     return 'aborted'
+    if outcome_map['SEND_WAYPOINT'] == 'aborted':
+        return 'aborted'
     if outcome_map['TALK_IN_MOVING'] == 'start mapping':
         return 'start mapping'
     if outcome_map['HAND_IMPACT'] == 'succeeded':

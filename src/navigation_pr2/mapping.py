@@ -5,7 +5,6 @@ import smach
 import re
 import rospy
 import actionlib
-import romkan
 from std_srvs.srv import Empty
 from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
@@ -14,13 +13,13 @@ from navigation_pr2.srv import ChangeFloor
 class WaitForTeaching(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
-                             output_keys=['new_spot_name', 'new_spot_name_jp'])
+                             output_keys=['new_spot_name'])
         self.speak = client
-        rospy.wait_for_service('/spot_map_server/change_floor')
-        rospy.wait_for_service('/map_manager/change_floor')
+        # rospy.wait_for_service('/spot_map_server/change_floor')
+        # rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
-        self.py_floor(command=0, floor='empty')
+        # self.py_floor(command=0, floor='empty')
         self.initialized = False
 
     def execute(self, userdata):
@@ -29,14 +28,13 @@ class WaitForTeaching(smach.State):
                 self.speak.say('ここは何階ですか?')
                 rospy.loginfo('waiting for floor...')
                 if wait_for_speech(timeout=20):
-                    speech_roman = rospy.get_param('~speech_roman')
+                    speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
                     rospy.delete_param('~speech_raw')
-                    rospy.delete_param('~speech_roman')
-                    if re.search(r'(.*)kai.*$', speech_roman) is not None:
-                        floor_name = re.search(r'(.*)kai.*$', speech_roman).group(1)
-                        self.speak.say('{}階ですね。ありがとうございます'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
-                        self.eus_floor(floor=floor_name)
-                        self.py_floor(command=1, floor=floor_name)
+                    if re.search(r'(.*)階.*$', speech_raw) is not None:
+                        self.floor_name = re.search(r'(.*)階.*$', speech_raw).group(1)
+                        self.speak.say('{}階ですね。ありがとうございます'.format(self.floor_name))
+                        self.eus_floor(floor=self.floor_name)
+                        # self.py_floor(command=1, floor=self.floor_name)
                         break
                 else:
                     continue
@@ -45,47 +43,41 @@ class WaitForTeaching(smach.State):
 
         if not wait_for_speech(timeout=30):
             return 'timeout'
-        speech_raw = rospy.get_param('~speech_raw')
-        speech_roman = rospy.get_param('~speech_roman')
+        speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
         rospy.delete_param('~speech_raw')
-        rospy.delete_param('~speech_roman')
-        if re.search(r'.*kokoga(.*)dayo$', speech_roman) is not None:
-            extracted_name = re.search(r'^kokoga(.*)dayo$', speech_roman).group(1)
-            userdata.new_spot_name = extracted_name
-            userdata.new_spot_name_jp = romkan.to_hiragana(extracted_name)
-            self.speak.say('{}というのですね'.format(romkan.to_hiragana(extracted_name).encode('utf-8')))
+        if re.search(r'.*ここが(.*)だよ$', speech_raw) is not None:
+            userdata.new_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
+            self.speak.say('{}というのですね'.format(re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)))
             return 'name received'
-        elif re.search(r'.*tigai.*$', speech_roman) is not None:
+        elif re.search(r'.*違い.*$', speech_raw) is not None:
             self.speak.say('失礼しました')
             return 'cancelled'
-        elif re.search(r'^(.*)kai.*tuita.*$', speech_roman) is not None:
-            floor_name = re.search(r'^(.*)kai.*tuita.*$', speech_roman).group(1)
-            self.speak.say('{}階ですね。ちょっと待ってください'.format(romkan.to_hiragana(floor_name).encode('utf-8')))
-            self.eus_floor(floor=floor_name)
-            self.py_floor(command=1, floor=floor_name)
+        elif re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+            self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
+            self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
+            self.eus_floor(floor=self.floor_name)
+            self.py_floor(command=1, floor=self.floor_name)
             return 'aborted'
-        elif re.findall('owari', speech_roman):
-            self.py_floor(command=2, floor=floor_name)
+        elif re.findall('終了', speech_raw):
+            # self.py_floor(command=2, floor=self.floor_name)
             return 'end'
-        elif re.findall('annai', speech_roman):
+        elif re.findall('案内', speech_raw):
             return 'request navigation'
-        self.speak.parrot(speech_roman)
+        self.speak.parrot(speech_raw)
         return 'aborted'
 
 class SendWithName(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name', 'new_spot_name_jp'])
+        smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
         self.ac.wait_for_server()
 
     def execute(self, userdata):
         name = userdata.new_spot_name
-        name_jp = userdata.new_spot_name_jp
-        rospy.loginfo("add new spot: {}".format(name_jp.encode('utf-8')))
+        rospy.loginfo("add new spot: {}".format(name))
         goal = RecordSpotGoal()
         goal.command = 1
         goal.name = name
-        goal.name_jp = name_jp
         self.ac.send_goal(goal)
         return 'send spot with name'
 
@@ -117,15 +109,6 @@ class SwitchRecordWithoutName(smach.State):
                 self.service_preempt()
                 return 'preempted'
             rospy.sleep(1.0)
-
-class SetMapAvailable(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded'],
-                             output_keys=['map_available'])
-
-    def execute(self, userdata):
-        userdata.map_available = 'true'
-        return 'succeeded'    
 
 class ExplainMapping(smach.State):
     def __init__(self):
