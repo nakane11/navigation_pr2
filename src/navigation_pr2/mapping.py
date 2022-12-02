@@ -7,19 +7,22 @@ import rospy
 import actionlib
 from std_srvs.srv import Empty
 from navigation_pr2.utils import *
+from navigation_pr2.kks_client import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from navigation_pr2.srv import ChangeFloor
+
+floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9'}
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name'])
         self.speak = client
-        # rospy.wait_for_service('/spot_map_server/change_floor')
-        # rospy.wait_for_service('/map_manager/change_floor')
+        rospy.wait_for_service('/spot_map_server/change_floor')
+        rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
-        # self.py_floor(command=0, floor='empty')
+        self.py_floor(command=0, floor='empty')
         self.initialized = False
 
     def execute(self, userdata):
@@ -33,8 +36,9 @@ class WaitForTeaching(smach.State):
                     if re.search(r'(.*)階.*$', speech_raw) is not None:
                         self.floor_name = re.search(r'(.*)階.*$', speech_raw).group(1)
                         self.speak.say('{}階ですね。ありがとうございます'.format(self.floor_name))
-                        self.eus_floor(floor=self.floor_name)
-                        # self.py_floor(command=1, floor=self.floor_name)
+                        floor_name = floors[self.floor_name]
+                        self.eus_floor(floor=floor_name)
+                        self.py_floor(command=1, floor=floor_name)
                         break
                 else:
                     continue
@@ -55,11 +59,14 @@ class WaitForTeaching(smach.State):
         elif re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
             self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
             self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
-            self.eus_floor(floor=self.floor_name)
-            self.py_floor(command=1, floor=self.floor_name)
+            floor_name = floors[self.floor_name]
+            self.eus_floor(floor=floor_name)
+            self.py_floor(command=1, floor=floor_name)
             return 'aborted'
         elif re.findall('終了', speech_raw):
-            # self.py_floor(command=2, floor=self.floor_name)
+            print(self.floor_name)
+            floor_name = floors[self.floor_name]
+            self.py_floor(command=2, floor=floor_name)
             return 'end'
         elif re.findall('案内', speech_raw):
             return 'request navigation'
@@ -71,13 +78,15 @@ class SendWithName(smach.State):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
         self.ac.wait_for_server()
+        self.kks = KKSClient()
 
     def execute(self, userdata):
         name = userdata.new_spot_name
         rospy.loginfo("add new spot: {}".format(name))
         goal = RecordSpotGoal()
         goal.command = 1
-        goal.name = name
+        goal.name_jp = name
+        goal.name = self.kks.do(name.decode('utf-8'))
         self.ac.send_goal(goal)
         return 'send spot with name'
 
