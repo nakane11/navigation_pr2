@@ -18,7 +18,7 @@
   <!--   <param name="robot" value="pr2"/> -->
   <!-- </node> -->
 
-  <node name="spot_map_erver"
+  <node name="spot_map_server"
         pkg="navigation_pr2" type="spot_map_server.py"
         output="screen"
         clear_params="true" >
