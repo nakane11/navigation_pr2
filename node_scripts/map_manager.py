@@ -157,7 +157,7 @@ class MapManager(object):
         self.start_multirobot_map_merge(self.current_floor, trans, rot)
         # self.start_map_server(self.current_floor)
         self.start_amcl()
-        time.sleep(8)
+        time.sleep(15)
         self.publish_initialpose(trans, rot)
 
     def change_floor(self, floor):
@@ -191,6 +191,7 @@ class MapManager(object):
         msg.pose.covariance[6 * 0 + 0] = 0.5 * 0.5
         msg.pose.covariance[6 * 1 + 1] = 0.5 * 0.5
         msg.pose.covariance[6 * 5 + 5] = math.pi/12.0 *  math.pi/12.0
+        print(msg)
         self.initialpose.publish(msg)
 
     def set_initialpose_param(self, ns, trans, rot):
