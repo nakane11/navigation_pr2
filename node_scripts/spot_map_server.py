@@ -68,7 +68,10 @@ class SpotMapServer(object):
         id = 1
         for i in list(self.active_graph.nodes):
             node = self.active_graph.nodes[i]
-            pin = make_pin_marker(i, node['pose'], id, rospy.Time.now(), radius=0.27)
+            if not 'name' in node:
+                pin = make_pin_marker(i, node['pose'], id, rospy.Time.now(), radius=0.27, color=[0.5,0.5,0.5])
+            else:
+                pin = make_pin_marker(i, node['pose'], id, rospy.Time.now(), radius=0.27)
             node_array_msg.markers.extend(pin)
             id += 1
         id = 1
@@ -76,8 +79,9 @@ class SpotMapServer(object):
         for edge in list(self.active_graph.edges):
             p1 = self.active_graph.nodes[edge[0]]['pose']
             p2 = self.active_graph.nodes[edge[1]]['pose']
-            l = make_line_marker(p1, p2, id, rospy.Time.now(), color=(0,0,1))
-            edge_array_msg.markers.append(l)
+            l = make_line_marker(p1, p2, id, rospy.Time.now(), color=(1,0,0))
+            edge_array_msg.markers.extend([l])
+            id += 1
         self.node_pub.publish(node_array_msg)
         self.edge_pub.publish(edge_array_msg)
     
@@ -134,6 +138,7 @@ class SpotMapServer(object):
                     mapping = {self.current_node: node_name}
                     self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
                     self.active_graph.nodes[node_name]['name'] = name[1]
+                    rospy.loginfo('Replace {} to {}'.format(self.current_node, node_name))
                     self.current_node = node_name
                     return
         for i in list(self.active_graph.nodes):
@@ -142,14 +147,16 @@ class SpotMapServer(object):
                 pose_i = node_i['pose']
                 diff = compute_difference_between_poses(pose, pose_i)
                 if diff < 0.4:
-                    if self.current_node:
+                    if self.current_node and self.current_node != i:
                         self.active_graph.add_edge(self.current_node, i)
+                        rospy.loginfo('Add edge {} to {}'.format(self.current_node, i))
                         self.current_node = i
-                    if name:
+                    if name :
                         node_name = name[0]
                         mapping = {i: node_name}
                         self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
                         self.active_graph.nodes[node_name]['name'] = name[1]
+                        rospy.loginfo('Replace {} to {}'.format(self.current_node, node_name))
                         self.current_node = node_name
                     return
         # 名前がない場合に数字を使用
@@ -159,18 +166,21 @@ class SpotMapServer(object):
         else:
             node_name = name[0]
         self.active_graph.add_node(node_name)
+        rospy.loginfo('Add node {}'.format(node_name))
         self.active_graph.nodes[node_name]['pose'] = pose
         if name:
             self.active_graph.nodes[node_name]['name'] = name[1]
         # range, action, description
         if self.current_node:
             self.active_graph.add_edge(node_name, self.current_node)
+            rospy.loginfo('Add edge {} to {}'.format(node_name, self.current_node))
         self.current_node = node_name
         return
 
     def remove_spot(self, name=None, graph_name=None):
         if not name:
             self.active_graph.remove_node(self.current_node)
+            rospy.loginfo('Remove node {}'.format(self.current_node))
             self.current_node = None
             return
         if graph_name:
@@ -178,12 +188,14 @@ class SpotMapServer(object):
             for n in list(target_graph.nodes):
                 if target_graph.nodes[n]['name'] == name:
                     target_graph.remove_node(n)
+                    rospy.loginfo('Remove node {}'.format(n))
             self.graph_dict[graph_name] = target_graph
         else:
             target_graph = self.active_graph
             for n in list(target_graph.nodes):
                 if target_graph.nodes[n]['name'] == name:
                     target_graph.remove_node(n)
+                    rospy.loginfo('Remove node {}'.format(n))
             self.active_graph = target_graph
         return
         

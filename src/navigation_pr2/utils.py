@@ -138,7 +138,7 @@ def make_text(string,
 
 def make_line(pose1=[0.0, 0.0, 0.0],
               pose2=[0.0, 0.0, 0.0],
-              scale=0.005,
+              scale=0.02,
               color=(0.0, 0.0, 0.0, 1.0),
               lifetime=25,
               id=0,
@@ -151,6 +151,7 @@ def make_line(pose1=[0.0, 0.0, 0.0],
 
     mesh_marker = Marker(type=Marker.LINE_LIST, header=header, id=id)
     mesh_marker.ns = ns
+    mesh_marker.id = id
     p1 = Point(x=pose1[0], y=pose1[1], z=pose1[2])
     p2 = Point(x=pose2[0], y=pose2[1], z=pose2[2])
     mesh_marker.points.append(p1)
@@ -182,11 +183,9 @@ def make_pin_marker(name, pose, id, stamp, height = 1.8, radius= 0.1, color=None
     return [cyl, cub, txt]
 
 def make_line_marker(pose1, pose2, id, stamp, color=None, alpha=0.7, lifetime=15, frame_id='/map'):
-    print(pose1)
-    print(pose2)
     if color is None:
         color = colors[id % N]
     line = make_line([pose1.position.x, pose1.position.y, pose1.position.z],
                      [pose2.position.x, pose2.position.y, pose2.position.z],
-                     id, color=tuple(color) + (alpha,), frame_id=frame_id, stamp=stamp)
+                     id=id, color=tuple(color) + (alpha,), ns='edge', frame_id=frame_id, stamp=stamp)
     return line
