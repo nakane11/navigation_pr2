@@ -75,14 +75,7 @@ class NavigationSmach():
                 with sm_send_waypoint:
                     smach.StateMachine.add('CHECK_GOAL', CheckGoal(),
                                            transitions={'succeeded':'succeeded',
-                                                        'unreached':'CHECK_ELEVATOR',
-                                                        'aborted':'aborted'})
-                    smach.StateMachine.add('CHECK_ELEVATOR', CheckElevator(),
-                                           transitions={'use':'MOVE_TO_ELEVATOR',
-                                                        'not use':'SEND_MOVE_TO',
-                                                        'aborted':'aborted'})
-                    smach.StateMachine.add('MOVE_TO_ELEVATOR', MoveToElevator(),
-                                           transitions={'succeeded':'SEND_MOVE_TO',
+                                                        'unreached':'SEND_MOVE_TO',
                                                         'aborted':'aborted'})
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_GOAL',
