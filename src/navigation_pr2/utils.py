@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import rospy
 import numpy as np
@@ -13,6 +14,8 @@ from geometry_msgs.msg import Point
 
 N = 256
 colors = labelcolormap(N=N) / 255.0
+
+floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9'}
 
 def wait_for_speech(timeout=0):
     start_time = rospy.Time.now()

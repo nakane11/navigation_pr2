@@ -7,6 +7,7 @@ uint8 OBJECT=5
 uint8 PEOPLE=6
 
 string name
+string floor
 # type of the node
 uint8 type
 # goal position

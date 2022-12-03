@@ -16,17 +16,6 @@ class Navigation(smach.State):
     def execute(self, userdata):
         return 'goal reached'
 
-class CheckIfNavigationAvailable(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['true', 'false'],
-                             input_keys=['map_available'])
-
-    def execute(self, userdata):
-        if userdata.map_available:
-            return 'true'
-        else:
-            return 'false'
-
 class SetGoal(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
@@ -48,27 +37,28 @@ class GetWaypoints(smach.State):
         smach.State.__init__(self, outcomes=['ready to move', 'no path found'],
                              input_keys=['goal_spot'],
                              output_keys=['waypoints', 'next_point'])
-        self.poses = []
         self.speak = client
-        self.waypoints_sub = rospy.Subscriber('/spot_map_server/poses', PoseStamped, self.waypoints_cb)
-        rospy.wait_for_service('find_path')
-        self.call = rospy.ServiceProxy('find_path', Path)
-
-    def waypoints_cb(self, msg):
-        self.poses.append(msg.pose)
+        rospy.wait_for_service('/spot_map_server/find_path')
+        self.call = rospy.ServiceProxy('/spot_map_server/find_path', Path)
 
     def execute(self, userdata):
         goal_name = userdata.goal_spot
-        self.poses = []
         self.speak.say('経路を探します。')
-        ret = self.call(goal_name=goal_name)
-        if ret.result:
-            userdata.waypoints = self.poses
+        res = self.call(goal_name=goal_name)
+        if res.result == 0:
+            userdata.waypoints = res.waypoints
+            floor = rospy.get_param('~floor')
+            if res.goal_floor != floor:
+                goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
+                self.speak.say('{}は{}階にあります。'.format(goal_name, goal_floor))
             userdata.next_point = -1
             return 'ready to move'
-        else:
-            self.speak.say('すみません。案内できません。')
-            return 'no path found'
+        elif res.result == 1:
+            self.speak.say('すみません。どこにあるかわかりません。')
+        elif res.result == 2:
+            goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
+            self.speak.say('すみません。{}は{}階にありますが案内できません。'.format(goal_name, goal_floor))
+        return 'no path found'
 
 class GetSpeechinMoving(smach.State):
     def __init__(self):
@@ -92,7 +82,7 @@ class GetSpeechinMoving(smach.State):
             floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
             self.speak.say('{}階ですね'.format(floor_name))
             self.eus_floor(floor=floor_name)
-            self.py_floor(command=1, floor=floor_name)
+            # self.py_floor(command=1, floor=floor_name)
             return 'aborted'
         return 'aborted'
 

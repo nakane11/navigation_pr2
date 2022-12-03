@@ -10,18 +10,16 @@ from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from navigation_pr2.srv import ChangeFloor
 
-floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9'}
-
 class WaitForTeaching(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name'])
         self.speak = client
-        rospy.wait_for_service('/spot_map_server/change_floor')
-        rospy.wait_for_service('/map_manager/change_floor')
+        rospy.wait_for_service('spot_map_server/change_floor')
+        # rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
-        self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
-        self.py_floor(command=0, floor='empty')
+        # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+        # self.py_floor(command=0, floor='empty')
         self.initialized = False
 
     def execute(self, userdata):
@@ -37,7 +35,8 @@ class WaitForTeaching(smach.State):
                         self.speak.say('{}階ですね。ありがとうございます'.format(self.floor_name))
                         floor_name = floors[self.floor_name]
                         self.eus_floor(floor=floor_name)
-                        self.py_floor(command=1, floor=floor_name)
+                        # self.py_floor(command=1, floor=floor_name)
+                        rospy.set_param('~floor', floor_name)
                         break
                 else:
                     continue
@@ -60,12 +59,13 @@ class WaitForTeaching(smach.State):
             self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
             floor_name = floors[self.floor_name]
             self.eus_floor(floor=floor_name)
-            self.py_floor(command=1, floor=floor_name)
+            # self.py_floor(command=1, floor=floor_name)
+            rospy.set_param('~floor', floor_name)
             return 'aborted'
         elif re.findall('終了', speech_raw):
             print(self.floor_name)
             floor_name = floors[self.floor_name]
-            self.py_floor(command=2, floor=floor_name)
+            # self.py_floor(command=2, floor=floor_name)
             return 'end'
         elif re.findall('案内', speech_raw):
             return 'request navigation'
@@ -75,7 +75,7 @@ class WaitForTeaching(smach.State):
 class SendWithName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
-        self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
+        self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
         self.ac.wait_for_server()
 
     def execute(self, userdata):
@@ -90,8 +90,8 @@ class SendWithName(smach.State):
 class SendCancelName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        self.ac = actionlib.SimpleActionClient('/record_spot', RecordSpotAction)
-        self.ac.wait_for_server()
+        self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
+        # self.ac.wait_for_server()
 
     def execute(self, userdata):
         goal = RecordSpotGoal()
@@ -102,10 +102,14 @@ class SendCancelName(smach.State):
 class SwitchRecordWithoutName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted'])
-        rospy.wait_for_service('start_auto_map')
-        self.start = rospy.ServiceProxy('start_auto_map', Empty)
-        rospy.wait_for_service('stop_auto_map')
-        self.stop = rospy.ServiceProxy('stop_auto_map', Empty)
+        rospy.sleep(3.0)
+        rospy.wait_for_service('/look_at_human/start')
+        rospy.sleep(3.0)
+        rospy.wait_for_service('spot_map_server/start')
+        self.start = rospy.ServiceProxy('spot_map_server/start', Empty)
+        rospy.sleep(3.0)
+        rospy.wait_for_service('spot_map_server/stop')
+        self.stop = rospy.ServiceProxy('spot_map_server/stop', Empty)
 
     def execute(self, userdata):
         self.start()

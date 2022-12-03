@@ -13,6 +13,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from navigation_pr2.msg import RecordSpotAction, RecordSpotResult
 from navigation_pr2.srv import ChangeFloor, ChangeFloorResponse
 from navigation_pr2.srv import Path, PathResponse
+from navigation_pr2.msg import Node
 
 
 class SpotMapServer(object):
@@ -96,7 +97,13 @@ class SpotMapServer(object):
                 self.add_spot(pose, goal.name)
         elif goal.command == 2:
             self.remove_spot(name)
-        
+        elif goal.command == 3:
+            pose = self.get_robotpose()
+            if pose:
+                self.add_spot(pose, goal.name)
+                self.update_spot_info(goal.name, goal.node)
+        elif goal.command == 4:
+            self.update_spot_info(goal.name, goal.node)
         result = RecordSpotResult()
         self.add.set_succeeded(result)
         return
@@ -113,6 +120,7 @@ class SpotMapServer(object):
         goal_graph = None
         goal_floor = None
         resp = PathResponse(result=0)
+        waypoints = []
 
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
@@ -127,22 +135,62 @@ class SpotMapServer(object):
         if goal_graph is None:
             resp.result = 1
             return resp
+        resp.goal_floor = goal_floor
         try:
-            #同じ階(エレベータを使わない)
+            #同じ階
             if self.active_graph_name == goal_floor:
                 path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
+                for i in path_list:
+                    node = self.node_to_msg(self.active_graph.nodes[i])
+                    waypoints.append(node)
             #現在と違う階の場合
             else:
-                path_list_target_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator)
-                path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator)
+                for n in list(self.active_graph.nodes):
+                    if n['type'] == 1:
+                        elevator_source = n
+                        break
+                for n in list(goal_graph.nodes):
+                    if n['type'] == 1:
+                        elevator_target = n
+                        break
+                if not (elevator_source and elevator_target):
+                    resp.result = 2
+                    return resp
+                path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator_source)
+                path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
+                for i in path_list_source_floor:
+                    node = self.node_to_msg(i, self.active_graph.nodes[i])
+                    waypoints.append(node)
+                for i in path_list_target_floor:
+                    node = self.node_to_msg(i, self.goal_graph.nodes[i])
+                    waypoints.append(node)
+            resp.waypoints = waypoints
+            return resp
         except Excetion as e:
             rospy.loginfo(e)
             resp.result = 2
             return resp
-        # for i in path_list_target_floor:
-        #     pose = self.active_graph.nodes[i]['pose']
 
+    def node_to_msg(self, name, n):
+        node_msg = Node()
+        node_msg.name = name
+        node_msg.floor = n['floor']
+        node_msg.type = n['type']
+        node_msg.pose = n['pose']
+        node_msg.range = n['range'] if 'range' in n else 0.0
+        node_msg.wait = n['wait'] if 'wait' in n else 0.0
+        node_msg.description = n['description'] if 'description' in n else ''
+        node_msg.read_out = n['read_out'] if 'read_out' in n else ''
+        node_msg.keys = n['keys'] if 'keys' in n else []
+        return node_msg
 
+    def update_spot_info(self, name, node_info):
+        self.active_graph.nodes[name]['type'] = node_info.type
+        self.active_graph.nodes[name]['range'] = node_info.range
+        self.active_graph.nodes[name]['wait'] = node_info.wait
+        self.active_graph.nodes[name]['description'] = node_info.description
+        self.active_graph.nodes[name]['read_out'] = node_info.read_out
+        self.active_graph.nodes[name]['keys'] = node_info.keys
 
     def get_robotpose(self):
         try:
@@ -158,7 +206,7 @@ class SpotMapServer(object):
         pose.orientation.z = rot[2]
         pose.orientation.w = rot[3]        
         return pose
-        
+
     def add_spot(self, pose, name=None):
         # 一つ前のノードが自動記録されていて距離が近い場合に置き換え
         if self.current_node and name:
@@ -200,10 +248,11 @@ class SpotMapServer(object):
             node_name = name
         self.active_graph.add_node(node_name)
         rospy.loginfo('Add node {}'.format(node_name))
+        self.active_graph.nodes[node_name]['type'] = 0
         self.active_graph.nodes[node_name]['pose'] = pose
+        self.active_graph.nodes[node_name]['floor'] = self.active_graph_name
         if name:
             self.active_graph.nodes[node_name]['name'] = True
-        # range, action, description
         if self.current_node:
             self.active_graph.add_edge(node_name, self.current_node)
             rospy.loginfo('Add edge {} to {}'.format(node_name, self.current_node))
@@ -241,6 +290,7 @@ class SpotMapServer(object):
         else:
             self.active_graph = nx.MultiGraph()
         self.active_graph_name = name
+        self.current_node = None
         rospy.loginfo('nodes: {}'.format(list(self.active_graph.nodes)))
 
 

@@ -31,9 +31,7 @@ class NavigationSmach():
                                         outcome_cb=con_mapping_out_cb)
 
         with con_mapping:
-            
             sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation'])
-            
             with sm_record_with_name:
                 smach.StateMachine.add('WAIT_FOR_TEACHING', WaitForTeaching(client=self.speak),
                                        transitions={'timeout':'EXPLAIN',
@@ -48,10 +46,8 @@ class NavigationSmach():
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('EXPLAIN', ExplainMapping(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
-            
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
-
         ###################################
         ###########  NAVIGATION  ##########
         ###################################
