@@ -48,15 +48,16 @@ class NavigationSmach():
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
+
+
         ###################################
         ###########  NAVIGATION  ##########
         ###################################
-
         sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'])
         with sm_navigation:
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping'],
-                                           input_keys=['waypoints', 'next_point'],
+                                           input_keys=['waypoints', 'next_point', 'goal_spot'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
                                            outcome_cb=con_moving_out_cb)
@@ -71,14 +72,17 @@ class NavigationSmach():
                                                         'start mapping':'start mapping',
                                                         'aborted':'GET_SPEECH_IN_MOVING'})
                 sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted'],
-                                                      input_keys=['waypoints', 'next_point'])
+                                                      input_keys=['waypoints', 'next_point', 'goal_spot'])
                 with sm_send_waypoint:
-                    smach.StateMachine.add('CHECK_GOAL', CheckGoal(),
+                    smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(),
                                            transitions={'succeeded':'succeeded',
-                                                        'unreached':'SEND_MOVE_TO',
+                                                        'unreached':'EXECUTE_STATE',
+                                                        'aborted':'aborted'})
+                    smach.StateMachine.add('EXECUTE_STATE', ExecuteState(),
+                                           transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted'})
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
-                                           transitions={'succeeded':'CHECK_GOAL',
+                                           transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted'})
                 sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:

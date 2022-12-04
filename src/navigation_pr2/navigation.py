@@ -50,14 +50,14 @@ class GetWaypoints(smach.State):
             floor = rospy.get_param('~floor')
             if res.goal_floor != floor:
                 goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-                self.speak.say('{}は{}階にあります。'.format(goal_name, goal_floor))
+                self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), goal_floor))
             userdata.next_point = -1
             return 'ready to move'
         elif res.result == 1:
             self.speak.say('すみません。どこにあるかわかりません。')
         elif res.result == 2:
             goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-            self.speak.say('すみません。{}は{}階にありますが案内できません。'.format(goal_name, goal_floor))
+            self.speak.say('すみません。{}は{}階にありますが案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
         return 'no path found'
 
 class GetSpeechinMoving(smach.State):
@@ -86,27 +86,26 @@ class GetSpeechinMoving(smach.State):
             return 'aborted'
         return 'aborted'
 
-class CheckGoal(smach.State):
+class CheckIfGoalReached(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'unreached', 'preempted', 'aborted'],
-                             input_keys=['waypoints', 'next_point'],
+                             input_keys=['waypoints', 'next_point', 'goal_spot'],
                              output_keys=['next_point'])
 
     def execute(self, userdata):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
+        goal_name = userdata.goal_spot
         next_point = userdata['next_point']
         waypoints = userdata['waypoints']
         if next_point > -1:
-            pass
-            # if waypoints[next_point] is close to goal
-            # return 'succeeded'
+            if waypoints[next_point].name.decode('utf-8') == goal_name:
+                return 'succeeded'
         userdata.next_point = next_point + 1
         if len(waypoints) <= next_point + 1:
             return 'aborted'
         return 'unreached'
-
 
 class SendMoveTo(smach.State):
     def __init__(self):
@@ -121,6 +120,22 @@ class SendMoveTo(smach.State):
         waypoints = userdata['waypoints']
         index = userdata['next_point']
         goal = waypoints[index]
+        return 'succeeded'
+
+class ExecuteState(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
+                             input_keys=['waypoints', 'next_point'])
+
+    def execute(self, userdata):
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        waypoints = userdata['waypoints']
+        index = userdata['next_point']
+        target_point = waypoints[index]
+        print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
+        rospy.sleep(5)
         return 'succeeded'
 
 class Interrupt(smach.State):
