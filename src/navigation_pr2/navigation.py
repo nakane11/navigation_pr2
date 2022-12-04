@@ -4,6 +4,11 @@
 import rospy
 import smach
 import re
+import actionlib
+from actionlib_msgs.msg import GoalStatus
+import math
+from tf import TransformListener
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import PoseStamped
 from pr2_mechanism_msgs.srv import SwitchController
 from navigation_pr2.srv import Path, ChangeFloor
@@ -57,7 +62,7 @@ class GetWaypoints(smach.State):
             self.speak.say('すみません。どこにあるかわかりません。')
         elif res.result == 2:
             goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-            self.speak.say('すみません。{}は{}階にありますが案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
+            self.speak.say('すみません。{}は{}階にありますがエレベータの場所を知らないので案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
         return 'no path found'
 
 class GetSpeechinMoving(smach.State):
@@ -87,10 +92,11 @@ class GetSpeechinMoving(smach.State):
         return 'aborted'
 
 class CheckIfGoalReached(smach.State):
-    def __init__(self):
+    def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'unreached', 'preempted', 'aborted'],
                              input_keys=['waypoints', 'next_point', 'goal_spot'],
                              output_keys=['next_point'])
+        self.speak = client
 
     def execute(self, userdata):
         if self.preempt_requested():
@@ -101,30 +107,16 @@ class CheckIfGoalReached(smach.State):
         waypoints = userdata['waypoints']
         if next_point > -1:
             if waypoints[next_point].name.decode('utf-8') == goal_name:
+                self.speak.say('{}に到着しました。'.format(goal_name.encode('utf-8')))
                 return 'succeeded'
         userdata.next_point = next_point + 1
         if len(waypoints) <= next_point + 1:
             return 'aborted'
         return 'unreached'
 
-class SendMoveTo(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
-                             input_keys=['next_point', 'waypoints'])
-        self.pub = rospy.Publisher("move_base_simple/goal", PoseStamped, queue_size=1);
-
-    def execute(self, userdata):
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
-        waypoints = userdata['waypoints']
-        index = userdata['next_point']
-        goal = waypoints[index]
-        return 'succeeded'
-
 class ExecuteState(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'move'],
                              input_keys=['waypoints', 'next_point'])
 
     def execute(self, userdata):
@@ -135,7 +127,59 @@ class ExecuteState(smach.State):
         index = userdata['next_point']
         target_point = waypoints[index]
         print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
-        rospy.sleep(5)
+        if target_point.type == 0:
+            return 'move'
+        return 'succeeded'
+
+class SendMoveTo(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
+                             input_keys=['next_point', 'waypoints'])
+        self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
+        self.max_retry = rospy.get_param("~max_retry", 8)
+        self.base_frame_id = rospy.get_param('~base_frame_id','base_footprint')
+        self.goal_frame_id = rospy.get_param('~goal_frame_id','map')
+        self.listener = tf.TransformListener()
+        self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+
+    def execute(self, userdata):
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+        waypoints = userdata['waypoints']
+        index = userdata['next_point']
+        waypoint = waypoints[index]
+
+        goal_msg = MoveBaseGoal()
+        goal_msg.target_pose.header.frame_id = self.goal_frame_id
+        goal_msg.target_pose.pose.position = waypoint.pose.position
+        goal_msg.target_pose.pose.orientation = waypoint.pose.orientation
+        rospy.loginfo('Executing move_base goal to position (x,y): %s, %s' %
+                      (waypoint.pose.position.x, waypoint.pose.position.y))
+        self.client.send_goal(goal_msg)
+
+        retry_count = 0
+        distance = 10
+        while(distance > self.distance_tolerance):
+            now = rospy.Time.now()
+            self.listener.waitForTransform(self.goal_frame_id, self.base_frame_id, now, rospy.Duration(4.0))
+            trans,rot = self.listener.lookupTransform(self.goal_frame_id, self.base_frame_id, now)
+            distance = math.sqrt(pow(waypoint.pose.position.x-trans[0],2)+pow(waypoint.pose.position.y-trans[1],2))
+            if self.preempt_requested():
+                self.client.cancel_all_goals()
+                self.service_preempt()
+                return 'preempted'
+            state = self.client.get_state()
+            if state == GoalStatus.ABORTED or state == GoalStatus.PREEMPTED:
+                rospy.logwarn('Move_base failed because server received cancel request or goal was aborted')
+                if retry_count < self.max_retry:
+                    rospy.logwarn('Retry send goals')
+                    self.client.send_goal(goal_msg)
+                    retry_count += 1
+                    continue
+                rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
+                return 'aborted'
+            rospy.loginfo("{}m to the next waypoint.".format(distance))
         return 'succeeded'
 
 class Interrupt(smach.State):

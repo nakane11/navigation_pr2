@@ -74,16 +74,18 @@ class NavigationSmach():
                 sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted'],
                                                       input_keys=['waypoints', 'next_point', 'goal_spot'])
                 with sm_send_waypoint:
-                    smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(),
+                    smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(client=self.speak),
                                            transitions={'succeeded':'succeeded',
                                                         'unreached':'EXECUTE_STATE',
                                                         'aborted':'aborted'})
                     smach.StateMachine.add('EXECUTE_STATE', ExecuteState(),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
-                                                        'aborted':'aborted'})
+                                                        'aborted':'aborted',
+                                                        'move':'SEND_MOVE_TO'})
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
-                                                        'aborted':'aborted'})
+                                                        'aborted':'aborted',
+                                                        'preempted':'aborted'})
                 sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:
                     smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
