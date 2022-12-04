@@ -91,7 +91,7 @@ class SendCancelName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
-        # self.ac.wait_for_server()
+        self.ac.wait_for_server()
 
     def execute(self, userdata):
         goal = RecordSpotGoal()
@@ -102,12 +102,8 @@ class SendCancelName(smach.State):
 class SwitchRecordWithoutName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted'])
-        rospy.sleep(3.0)
-        rospy.wait_for_service('/look_at_human/start')
-        rospy.sleep(3.0)
         rospy.wait_for_service('spot_map_server/start')
         self.start = rospy.ServiceProxy('spot_map_server/start', Empty)
-        rospy.sleep(3.0)
         rospy.wait_for_service('spot_map_server/stop')
         self.stop = rospy.ServiceProxy('spot_map_server/stop', Empty)
 

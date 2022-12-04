@@ -14,7 +14,7 @@ class SpeakClient():
         self.pub.publish(str)
 
     def parrot(self, text):
-        script = "{}ですか？ よくわかりませんでした。"
+        script = "{}ですか？ よくわかりませんでした。".format(text)
         self.say(script)
 
     def get_volume(self):

@@ -109,7 +109,6 @@ class SpotMapServer(object):
         return
 
     def change_floor_cb(self, req):
-        print(req.floor)
         self.change_graph(req.floor)
         self.publish_markers(action=2)
         resp = ChangeFloorResponse()
@@ -141,17 +140,19 @@ class SpotMapServer(object):
             if self.active_graph_name == goal_floor:
                 path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
                 for i in path_list:
-                    node = self.node_to_msg(self.active_graph.nodes[i])
+                    node = self.node_to_msg(i, self.active_graph.nodes[i])
                     waypoints.append(node)
             #現在と違う階の場合
             else:
-                for n in list(self.active_graph.nodes):
+                for i in list(self.active_graph.nodes):
+                    n = self.active_graph.nodes[i]
                     if n['type'] == 1:
-                        elevator_source = n
+                        elevator_source = i
                         break
-                for n in list(goal_graph.nodes):
+                for i in list(goal_graph.nodes):
+                    n = self.active_graph.nodes[i]
                     if n['type'] == 1:
-                        elevator_target = n
+                        elevator_target = i
                         break
                 if not (elevator_source and elevator_target):
                     resp.result = 2
@@ -166,7 +167,7 @@ class SpotMapServer(object):
                     waypoints.append(node)
             resp.waypoints = waypoints
             return resp
-        except Excetion as e:
+        except Exception as e:
             rospy.loginfo(e)
             resp.result = 2
             return resp
