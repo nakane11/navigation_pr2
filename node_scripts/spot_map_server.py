@@ -122,6 +122,10 @@ class SpotMapServer(object):
         goal_floor_array=[]
         waypoints_array = []
         waypoints_length = []
+        curr_pose = self.get_robotpose()
+        start_node_candidates = list(self.active_graph.nodes)
+        start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
+        start_node = start_node_candidates[0]
 
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
@@ -149,7 +153,7 @@ class SpotMapServer(object):
                 #同じ階
                 if self.active_graph_name == floor:
                     print(2)
-                    path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
+                    path_list = nx.shortest_path(goal_graph, source=start_node, target=goal)
                     for i in path_list:
                         node = self.node_to_msg(i, self.active_graph.nodes[i])
                         waypoints.append(node)
@@ -172,7 +176,7 @@ class SpotMapServer(object):
                         waypoints_length.append(0)
                         continue
                     if elevator_source and elevator_target:
-                        path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator_source)
+                        path_list_source_floor = nx.shortest_path(goal_graph, source=self.start_node, target=elevator_source)
                         path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
                         for i in path_list_source_floor:
                             node = self.node_to_msg(i, self.active_graph.nodes[i])

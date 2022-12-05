@@ -103,9 +103,6 @@ class GetWaypoints(smach.State):
             userdata.floor_candidates = floor_list
             userdata.path_candidates = path_known
             return 'multiple goals'
-        
-            # goal_floor = [k for k, v in floors.items() if v == floor_list[0]][0]
-            # self.speak.say('{}階の{}でよろしいでしょうか？'.format(goal_floor, goal_name.encode('utf-8')))
             
         # if res.result == 0:
         #     userdata.waypoints = res.waypoints
@@ -133,7 +130,7 @@ class SuggestGoals(smach.State):
         goal_name = userdata.goal_spot
         floor_candidates = userdata.floor_candidates
         path_candidates = userdata.path_candidates
-        
+
         goal_floor = [k for k, v in floors.items() if v == floor_candidates[0]][0]
         self.speak.say('{}階の{}でよろしいでしょうか？'.format(goal_floor, goal_name.encode('utf-8')))
         while True:
