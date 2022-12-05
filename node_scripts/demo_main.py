@@ -104,7 +104,13 @@ class NavigationSmach():
                                                 'aborted':'aborted'})
             smach.StateMachine.add('GET_WAYPOINTS', GetWaypoints(client=self.speak),
                                    transitions={'ready to move':'START_NAVIGATION',
+                                                'multiple goals':'SUGGEST_GOALS',
                                                 'no path found':'aborted'})
+            smach.StateMachine.add('SUGGEST_GOALS', SuggestGoals(client=self.speak),
+                                   transitions={'ready to move':'START_NAVIGATION',
+                                                'rejected':'SUGGEST_GOALS',
+                                                'rejected all':'aborted'})
+
             smach.StateMachine.add('START_NAVIGATION', StartNavigation(client=self.speak),
                                    transitions={'succeeded': 'MOVING'})
             smach.StateMachine.add('MOVING', con_moving,

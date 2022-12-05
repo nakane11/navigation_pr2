@@ -116,61 +116,85 @@ class SpotMapServer(object):
 
     def find_path_cb(self, req):
         goal = req.goal_name
-        goal_graph = None
-        goal_floor = None
         resp = PathResponse(result=0)
-        waypoints = []
+        result_array=[]
+        goal_graph_dict = {}
+        goal_floor_array=[]
+        waypoints_array = []
+        waypoints_length = []
 
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
+            goal_graph = None
+            goal_floor = None
             if goal in list(graph.nodes):
-                goal_graph = graph
+                goal_graph_dict[name] = graph
                 goal_floor = name
-                break
-        if goal_graph is None:
-            if goal in list(self.active_graph.nodes):
-                goal_graph = self.active_graph
-                goal_floor = self.active_graph_name
-        if goal_graph is None:
-            resp.result = 1
-            return resp
-        resp.goal_floor = goal_floor
-        try:
-            #同じ階
-            if self.active_graph_name == goal_floor:
-                path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
-                for i in path_list:
-                    node = self.node_to_msg(i, self.active_graph.nodes[i])
-                    waypoints.append(node)
-            #現在と違う階の場合
-            else:
-                for i in list(self.active_graph.nodes):
-                    n = self.active_graph.nodes[i]
-                    if n['type'] == 1:
-                        elevator_source = i
-                        break
-                for i in list(goal_graph.nodes):
-                    n = self.active_graph.nodes[i]
-                    if n['type'] == 1:
-                        elevator_target = i
-                        break
-                if not (elevator_source and elevator_target):
-                    resp.result = 2
-                    return resp
-                path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator_source)
-                path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
-                for i in path_list_source_floor:
-                    node = self.node_to_msg(i, self.active_graph.nodes[i])
-                    waypoints.append(node)
-                for i in path_list_target_floor:
-                    node = self.node_to_msg(i, self.goal_graph.nodes[i])
-                    waypoints.append(node)
-            resp.waypoints = waypoints
-            return resp
-        except Exception as e:
-            rospy.loginfo(e)
-            resp.result = 2
-            return resp
+                goal_floor_array.append(goal_floor)
+
+        if goal in list(self.active_graph.nodes):
+            goal_graph_dict[self.active_graph_name] = self.active_graph
+            goal_floor = self.active_graph_name
+            goal_floor_array.append(goal_floor)
+
+        if goal_floor_array is None:
+            result_array = [1]
+
+        for floor in goal_floor_array:
+            print(1)
+            goal_graph = goal_graph_dict[floor]
+            print("goal_graph:{}".format(list(goal_graph.nodes)))
+            waypoints = []
+            try:
+                #同じ階
+                if self.active_graph_name == floor:
+                    print(2)
+                    path_list = nx.shortest_path(goal_graph, source=self.current_node, target=goal)
+                    for i in path_list:
+                        node = self.node_to_msg(i, self.active_graph.nodes[i])
+                        waypoints.append(node)
+                #現在と違う階の場合
+                else:
+                    print(3)
+                    for i in list(self.active_graph.nodes):
+                        n = self.active_graph.nodes[i]
+                        if n['type'] == 1:
+                            elevator_source = i
+                            break
+                    for i in list(goal_graph.nodes):
+                        n = self.active_graph.nodes[i]
+                        if n['type'] == 1:
+                            elevator_target = i
+                            break
+                    if not (elevator_source and elevator_target):
+                        print(4)
+                        result_array.append(2)
+                        waypoints_length.append(0)
+                        continue
+                    if elevator_source and elevator_target:
+                        path_list_source_floor = nx.shortest_path(goal_graph, source=self.current_node, target=elevator_source)
+                        path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
+                        for i in path_list_source_floor:
+                            node = self.node_to_msg(i, self.active_graph.nodes[i])
+                            waypoints.append(node)
+                        for i in path_list_target_floor:
+                            node = self.node_to_msg(i, goal_graph.nodes[i])
+                            waypoints.append(node)
+                result_array.append(0)
+                waypoints_array.extend(waypoints)
+                waypoints_length.append(len(waypoints))
+
+            except Exception as e:
+                rospy.loginfo(e)
+                result_array.append(2)
+                waypoints_length.append(0)
+        print("result:{}".format(result_array))
+        print("length:{}".format(waypoints_length))
+        resp.result = result_array
+        resp.goal_floor = goal_floor_array
+        resp.waypoints = waypoints_array
+        resp.waypoints_length = waypoints_length
+        return resp
 
     def node_to_msg(self, name, n):
         node_msg = Node()

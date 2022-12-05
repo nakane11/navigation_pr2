@@ -13,6 +13,7 @@ from geometry_msgs.msg import PoseStamped
 from pr2_mechanism_msgs.srv import SwitchController
 from navigation_pr2.srv import Path, ChangeFloor
 from navigation_pr2.utils import *
+import numpy as np
 
 class Navigation(smach.State):
     def __init__(self):
@@ -39,9 +40,9 @@ class SetGoal(smach.State):
 
 class GetWaypoints(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['ready to move', 'no path found'],
+        smach.State.__init__(self, outcomes=['ready to move', 'no path found', 'multiple goals'],
                              input_keys=['goal_spot'],
-                             output_keys=['waypoints', 'next_point'])
+                             output_keys=['waypoints', 'next_point', 'floor_candidates', 'path_candidates'])
         self.speak = client
         rospy.wait_for_service('/spot_map_server/find_path')
         self.call = rospy.ServiceProxy('/spot_map_server/find_path', Path)
@@ -50,20 +51,116 @@ class GetWaypoints(smach.State):
         goal_name = userdata.goal_spot
         self.speak.say('経路を探します。')
         res = self.call(goal_name=goal_name)
-        if res.result == 0:
-            userdata.waypoints = res.waypoints
-            floor = rospy.get_param('~floor')
-            if res.goal_floor != floor:
-                goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-                self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), goal_floor))
-            userdata.next_point = -1
-            return 'ready to move'
-        elif res.result == 1:
+        res.result = np.frombuffer(res.result, dtype=np.uint8)
+        print(res.result)
+        res.waypoints_length = np.frombuffer(res.waypoints_length, dtype=np.uint8)
+
+        # 一つも見つからなかった場合
+        if np.all(res.result == [1]):
             self.speak.say('すみません。どこにあるかわかりません。')
-        elif res.result == 2:
-            goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-            self.speak.say('すみません。{}は{}階にありますがエレベータの場所を知らないので案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
-        return 'no path found'
+            return 'no path found'
+
+        else:
+            path_known={}
+            path_unknown=[]
+            waypoints_array = res.waypoints
+            for result, floor, length in zip(res.result, res.goal_floor, res.waypoints_length):
+                if result == 0:
+                    path_known[floor] = waypoints_array[0:length]
+                    waypoints_array = waypoints_array[length:]
+                elif result == 2:
+                   path_unknown.append(floor)
+
+            # 場所はわかるが経路が一つも見つからなかった場合
+            if path_known == {} and path_unknown != []:
+                floor_str = ""
+                for i, floor in enumerate(path_unknown):
+                    goal_floor = [k for k, v in floors.items() if v == floor][0]
+                    floor_str += goal_floor
+                    print(floor_str)
+                    if i!=len(path_unknown)-1:
+                        floor_str+="階と"
+                self.speak.say('すみません。{}は{}階にありますが行き方を知らないので案内できません。'.format(goal_name.encode('utf-8'), floor_str))
+                return 'no path found'
+
+            current_floor = rospy.get_param('~floor')
+            floor_list = list(path_known.keys())
+
+            # pathが一つ見つかった場合
+            if len(floor_list) == 1:
+                target_floor = floor_list[0]
+                userdata.waypoints = path_known[floor_list[0]]
+                if target_floor != current_floor:
+                    target_floor = [k for k, v in floors.items() if v == current_floor][0]
+                    self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), target_floor))
+                userdata.next_point = -1
+                return 'ready to move'
+
+            # pathが一つ以上ある場合
+            print("before:{}".format(floor_list))
+            floor_list = sorted(floor_list, key=lambda x: abs(int(x)-int(current_floor)))
+            print("after:{}".format(floor_list))
+            userdata.floor_candidates = floor_list
+            userdata.path_candidates = path_known
+            return 'multiple goals'
+        
+            # goal_floor = [k for k, v in floors.items() if v == floor_list[0]][0]
+            # self.speak.say('{}階の{}でよろしいでしょうか？'.format(goal_floor, goal_name.encode('utf-8')))
+            
+        # if res.result == 0:
+        #     userdata.waypoints = res.waypoints
+        #     floor = rospy.get_param('~floor')
+        #     if res.goal_floor != floor:
+        #         goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
+        #         self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), goal_floor))
+        #     userdata.next_point = -1
+        #     return 'ready to move'
+        # elif res.result == 1:
+        #     self.speak.say('すみません。どこにあるかわかりません。')
+        # elif res.result == 2:
+        #     goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
+        #     self.speak.say('すみません。{}は{}階にありますがエレベータの場所を知らないので案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
+        # return 'no path found'
+
+class SuggestGoals(smach.State):
+    def __init__(self, client):
+        smach.State.__init__(self, outcomes=['ready to move', 'rejected', 'rejected all'],
+                             input_keys=['goal_spot', 'floor_candidates', 'path_candidates'],
+                             output_keys=['waypoints', 'next_point', 'floor_candidates', 'path_candidates'])
+        self.speak = client
+
+    def execute(self, userdata):
+        goal_name = userdata.goal_spot
+        floor_candidates = userdata.floor_candidates
+        path_candidates = userdata.path_candidates
+        
+        goal_floor = [k for k, v in floors.items() if v == floor_candidates[0]][0]
+        self.speak.say('{}階の{}でよろしいでしょうか？'.format(goal_floor, goal_name.encode('utf-8')))
+        while True:
+            rospy.loginfo('waiting for reply...')
+            if wait_for_speech(timeout=20):
+                speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
+                rospy.delete_param('~speech_raw')
+                if re.search(r'.*はい.*$', speech_raw) is not None:
+                    self.speak.say('かしこまりました。')
+                    userdata.waypoints = path_candidates[floor_candidates[0]]
+                    userdata.next_point = -1
+                    return 'ready to move'
+                elif re.search(r'.*いいえ.*$', speech_raw) is not None:
+                    break
+                else:
+                    continue
+            else:
+                break
+        if len(floor_candidates) <= 1:
+            self.speak.say('すみません。他に場所を知りません。')
+            return 'rejected all'
+        else:
+            userdata.floor_candidates = floor_candidates[1:]
+            path_candidates.pop(floor_candidates[0])
+            userdata.path_candidates = path_candidates
+            self.speak.say('それでは')
+            return 'rejected'
 
 class GetSpeechinMoving(smach.State):
     def __init__(self):
@@ -88,6 +185,7 @@ class GetSpeechinMoving(smach.State):
             self.speak.say('{}階ですね'.format(floor_name))
             self.eus_floor(floor=floor_name)
             # self.py_floor(command=1, floor=floor_name)
+            rospy.set_param('~floor', floor_name)
             return 'aborted'
         return 'aborted'
 

@@ -5,6 +5,7 @@ uint8 SEARCH_FAILED=2
 string goal_name
 uint8 solver
 ---
-uint8 result
-string goal_floor
+uint8[] result
+string[] goal_floor
 Node[] waypoints
+uint8[] waypoints_length
