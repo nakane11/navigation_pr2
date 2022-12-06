@@ -7,6 +7,8 @@ import math
 import tf
 import PyKDL
 import tf_conversions.posemath as pm
+from tf.transformations import quaternion_from_matrix as matrix2quaternion
+from tf.transformations import unit_vector as normalize_vector
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
 from jsk_recognition_utils.color import labelcolormap
@@ -192,3 +194,48 @@ def make_line_marker(pose1, pose2, id, stamp, color=None, alpha=0.7, lifetime=15
                      [pose2.position.x, pose2.position.y, pose2.position.z],
                      id=id, color=tuple(color) + (alpha,), ns='edge', frame_id=frame_id, stamp=stamp)
     return line
+
+def outer_product_matrix(v):
+    return np.array([[0, -v[2], v[1]],
+                     [v[2], 0, -v[0]],
+                     [-v[1], v[0], 0]])
+
+def cross_product(a, b):
+    return np.dot(outer_product_matrix(a), b)
+
+def rotation_matrix_from_axis(
+        first_axis=(1, 0, 0), second_axis=(0, 1, 0), axes='xy'):
+    if axes not in ['xy', 'yx', 'xz', 'zx', 'yz', 'zy']:
+        raise ValueError("Valid axes are 'xy', 'yx', 'xz', 'zx', 'yz', 'zy'.")
+    e1 = normalize_vector(first_axis)
+    e2 = normalize_vector(second_axis - np.dot(second_axis, e1) * e1)
+    if axes in ['xy', 'zx', 'yz']:
+        third_axis = cross_product(e1, e2)
+    else:
+        third_axis = cross_product(e2, e1)
+    e3 = normalize_vector(
+        third_axis - np.dot(third_axis, e1) * e1 - np.dot(third_axis, e2) * e2)
+    first_index = ord(axes[0]) - ord('x')
+    second_index = ord(axes[1]) - ord('x')
+    third_index = ((first_index + 1) ^ (second_index + 1)) - 1
+    indices = [first_index, second_index, third_index]
+    return np.vstack([e1, e2, e3])[np.argsort(indices)].T
+
+def changeOrientation(waypoints):
+    n = len(waypoints)
+    for i in range(n - 1):
+        pose_a = waypoints[i].pose
+        pose_b = waypoints[i+1].pose
+        pos_a = np.array([pose_a.position.x, pose_a.position.y, pose_a.position.z])
+        pos_b = np.array([pose_b.position.x, pose_b.position.y, pose_b.position.z])
+        v_ab = pos_b - pos_a
+        if np.linalg.norm(v_ab) == 0.0:
+            continue
+        matrix = np.eye(4)
+        matrix[:3, :3] = rotation_matrix_from_axis(v_ab, axes="xz")
+        q_xyzw = matrix2quaternion(matrix)
+        waypoints[i].pose.orientation.x = q_xyzw[0]
+        waypoints[i].pose.orientation.y = q_xyzw[1]
+        waypoints[i].pose.orientation.z = q_xyzw[2]
+        waypoints[i].pose.orientation.w = q_xyzw[3]
+    return waypoints

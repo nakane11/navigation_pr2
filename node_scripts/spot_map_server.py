@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import threading
 import networkx as nx
 import rospy
 import tf
 import actionlib
 import math
+from threading import Lock
 from navigation_pr2.utils import *
 from std_srvs.srv import Empty, EmptyResponse
 from geometry_msgs.msg import Pose
@@ -17,7 +19,8 @@ from navigation_pr2.msg import Node
 
 
 class SpotMapServer(object):
-    def __init__(self):
+    def __init__(self, lock):
+        self.lock = lock
         self.graph_dict = {}
         self.label = 1
         self.current_node = None
@@ -34,7 +37,32 @@ class SpotMapServer(object):
         self.find_path = rospy.Service('~find_path', Path, self.find_path_cb)
         self.add = actionlib.SimpleActionServer('~add', RecordSpotAction, execute_cb=self.add_spot_cb)
         self.add.start()
-        rospy.Timer(rospy.Duration(0.5), self.timer_cb)
+
+        self.thread = threading.Thread(target=self._loop)
+        self.thread.daemon = True  # terminate when main thread exit
+        self.thread.start()
+
+    def _loop(self):
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            rate.sleep()
+            if self.auto_map_enabled:
+                curr_pose = self.get_robotpose()
+                if not curr_pose:
+                    return
+                with self.lock:
+                    # 前のノードがなかった場合に追加
+                    if not self.current_node:
+                        self.add_spot(curr_pose)
+                    else:
+                        prev_pose = self.active_graph.nodes[self.current_node]['pose']
+                        angle = math.degrees(compute_angle_between_poses(curr_pose, prev_pose))
+                        diff = compute_difference_between_poses(curr_pose, prev_pose)
+                        # 前のノードとposeが十分違う場合に追加
+                        if ((40 < angle < 320) and diff > 0.3) or diff > 0.8:
+                            self.add_spot(curr_pose)
+
+            self.publish_markers()
 
     def start_auto_map(self, req):
         self.auto_map_enabled = True
@@ -45,24 +73,6 @@ class SpotMapServer(object):
         self.auto_map_enabled = False
         rospy.loginfo('auto map disabled')        
         return EmptyResponse()
-
-    def timer_cb(self, event):
-        if self.auto_map_enabled:
-            curr_pose = self.get_robotpose()
-            if not curr_pose:
-                return
-            # 前のノードがなかった場合に追加
-            if not self.current_node:
-                self.add_spot(curr_pose)
-                return
-            prev_pose = self.active_graph.nodes[self.current_node]['pose']
-            angle = math.degrees(compute_angle_between_poses(curr_pose, prev_pose))
-            diff = compute_difference_between_poses(curr_pose, prev_pose)
-            # 前のノードとposeが十分違う場合に追加
-            if ((40 < angle < 320) and diff > 0.3) or diff > 0.8:
-                self.add_spot(curr_pose)
-
-        self.publish_markers()
 
     def publish_markers(self, action=0):
         node_array_msg = MarkerArray()
@@ -87,23 +97,24 @@ class SpotMapServer(object):
         self.edge_pub.publish(edge_array_msg)
     
     def add_spot_cb(self, goal):
-        if goal.command == 0:
-            pose = self.get_robotpose()
-            if pose:
-                self.add_spot(pose)
-        elif goal.command == 1:
-            pose = self.get_robotpose()
-            if pose:
-                self.add_spot(pose, goal.name)
-        elif goal.command == 2:
-            self.remove_spot(name)
-        elif goal.command == 3:
-            pose = self.get_robotpose()
-            if pose:
-                self.add_spot(pose, goal.name)
+        with self.lock:
+            if goal.command == 0:
+                pose = self.get_robotpose()
+                if pose:
+                    self.add_spot(pose)
+            elif goal.command == 1:
+                pose = self.get_robotpose()
+                if pose:
+                    self.add_spot(pose, goal.name)
+            elif goal.command == 2:
+                self.remove_spot(name)
+            elif goal.command == 3:
+                pose = self.get_robotpose()
+                if pose:
+                    self.add_spot(pose, goal.name)
+                    self.update_spot_info(goal.name, goal.node)
+            elif goal.command == 4:
                 self.update_spot_info(goal.name, goal.node)
-        elif goal.command == 4:
-            self.update_spot_info(goal.name, goal.node)
         result = RecordSpotResult()
         self.add.set_succeeded(result)
         return
@@ -145,21 +156,18 @@ class SpotMapServer(object):
             result_array = [1]
 
         for floor in goal_floor_array:
-            print(1)
             goal_graph = goal_graph_dict[floor]
             print("goal_graph:{}".format(list(goal_graph.nodes)))
             waypoints = []
             try:
                 #同じ階
                 if self.active_graph_name == floor:
-                    print(2)
                     path_list = nx.shortest_path(goal_graph, source=start_node, target=goal)
                     for i in path_list:
                         node = self.node_to_msg(i, self.active_graph.nodes[i])
                         waypoints.append(node)
                 #現在と違う階の場合
                 else:
-                    print(3)
                     for i in list(self.active_graph.nodes):
                         n = self.active_graph.nodes[i]
                         if n['type'] == 1:
@@ -171,7 +179,6 @@ class SpotMapServer(object):
                             elevator_target = i
                             break
                     if not (elevator_source and elevator_target):
-                        print(4)
                         result_array.append(2)
                         waypoints_length.append(0)
                         continue
@@ -185,6 +192,7 @@ class SpotMapServer(object):
                             node = self.node_to_msg(i, goal_graph.nodes[i])
                             waypoints.append(node)
                 result_array.append(0)
+                waypoints = changeOrientation(waypoints)
                 waypoints_array.extend(waypoints)
                 waypoints_length.append(len(waypoints))
 
@@ -324,6 +332,7 @@ class SpotMapServer(object):
 
 
 if __name__ == '__main__':
+    lock = Lock()
     rospy.init_node('spot_map_server')
-    s = SpotMapServer()
+    s = SpotMapServer(lock)
     rospy.spin()
