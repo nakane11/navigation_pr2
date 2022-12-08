@@ -4,6 +4,7 @@
 import rospy
 import smach
 import re
+import dynamic_reconfigure.client
 from navigation_pr2.utils import *
 
 class Idling(smach.State):
@@ -34,8 +35,12 @@ class Idling(smach.State):
 class Initialize(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)        
 
     def execute(self, userdata):
+        self.dr.update_configuration({"acc_lim_x" : 2.0})
+        self.dr.update_configuration({"acc_lim_y" : 2.0})        
+        self.dr.update_configuration({"acc_lim_theta" : 2.2})
         return 'succeeded'
 
 class Explain(smach.State):
@@ -63,6 +68,17 @@ class Introduction(smach.State):
             self.speak.say('{}さんですね。よろしくお願いします。'.format(person_name))
             return 'succeeded'
         return 'aborted'
+
+class Shutdown(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'])
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)        
+
+    def execute(self, userdata):
+        self.dr.update_configuration({"acc_lim_x" : 2.5})
+        self.dr.update_configuration({"acc_lim_y" : 2.5})        
+        self.dr.update_configuration({"acc_lim_theta" : 5.0})
+        return 'succeeded'
 
 # wait
 # explain use

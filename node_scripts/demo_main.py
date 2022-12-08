@@ -151,7 +151,7 @@ class NavigationSmach():
                                    transitions={'timeout':'EXPLAIN',
                                                 'start navigation':'NAVIGATION',
                                                 'start mapping':'MAPPING',
-                                                'end':'succeeded',
+                                                'end':'SHUTDOWN',
                                                 'aborted':'IDLING',
                                                 'intro':'INTRODUCTION'})
             smach.StateMachine.add('NAVIGATION', sm_navigation,
@@ -161,8 +161,9 @@ class NavigationSmach():
             smach.StateMachine.add('MAPPING', con_mapping,
                                    transitions={'outcome':'MAPPING',
                                                 'succeeded':'IDLING',
-                                                'start navigation':'NAVIGATION'}
-            )
+                                                'start navigation':'NAVIGATION'})
+            smach.StateMachine.add('SHUTDOWN', Shutdown(),
+                                   transitions={'succeeded':'succeeded'})
 
         sis = smach_ros.IntrospectionServer('server_name', sm, '/SM_ROOT')
         sis.start()
