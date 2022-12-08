@@ -13,6 +13,8 @@ from geometry_msgs.msg import PoseStamped
 from pr2_mechanism_msgs.srv import SwitchController
 from navigation_pr2.srv import Path, ChangeFloor
 from navigation_pr2.utils import *
+from robothand.msg import StartHoldingAction, StartHoldingGoal
+from std_msgs.msg import Float32MultiArray
 import numpy as np
 
 class Navigation(smach.State):
@@ -296,17 +298,24 @@ class Interrupt(smach.State):
 class FinishNavigation(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
+        self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+        self.hand_client.wait_for_server()
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
 
     def execute(self, userdata):
         # 手繋ぎをやめる
         ret = self.controller(['l_arm_controller'], [], None)
+        goal = StartHoldingGoal(command=3)
+        self.hand_client.send_goal(goal)
+        self.hand_client.wait_for_result()
         return 'succeeded'
 
 class StartNavigation(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded'])
+        self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+        self.hand_client.wait_for_server()
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.speak = client
@@ -314,6 +323,10 @@ class StartNavigation(smach.State):
     def execute(self, userdata):
         self.speak.say('手を繋いで下さい')
         # 手繋ぎ
+        goal = StartHoldingGoal(command=0)
+        self.hand_client.send_goal(goal)
+        self.hand_client.wait_for_result()
+        print(self.hand_client.get_result())
         ret = self.controller([], ['l_arm_controller'], None)
         print(ret)
         self.speak.say('案内を開始します')
