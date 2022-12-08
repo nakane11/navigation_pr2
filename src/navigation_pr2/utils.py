@@ -232,9 +232,8 @@ def changeOrientation(waypoints):
         if np.linalg.norm(v_ab) == 0.0:
             continue
         matrix = np.eye(4)
-        matrix[:3, :3] = rotation_matrix_from_axis(v_ab, axes="xy")
+        matrix[:3, :3] = rotation_matrix_from_axis(v_ab, [0, 0, 1], axes="xz")
         q_xyzw = matrix2quaternion(matrix)
-        waypoints[i].pose.position.z = 0
         waypoints[i].pose.orientation.x = q_xyzw[0]
         waypoints[i].pose.orientation.y = q_xyzw[1]
         waypoints[i].pose.orientation.z = q_xyzw[2]

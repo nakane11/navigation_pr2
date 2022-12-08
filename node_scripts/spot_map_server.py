@@ -63,8 +63,8 @@ class SpotMapServer(object):
                         # 前のノードとposeが十分違う場合に追加
                         if ((40 < angle < 320) and diff > 0.3) or diff > 0.8:
                             self.add_spot(curr_pose)
-
-            self.publish_markers()
+            with self.lock:
+                self.publish_markers()
 
     def start_auto_map(self, req):
         self.auto_map_enabled = True
@@ -81,6 +81,8 @@ class SpotMapServer(object):
         id = 1
         for i in list(self.active_graph.nodes):
             node = self.active_graph.nodes[i]
+            if not 'pose' in node:
+                continue
             if not 'name' in node:
                 pin = make_pin_marker(i, node['pose'], id, rospy.Time.now(), radius=0.27, color=[0.5,0.5,0.5])
             else:
@@ -122,9 +124,10 @@ class SpotMapServer(object):
         return
 
     def change_floor_cb(self, req):
-        self.change_graph(req.floor)
-        self.publish_markers(action=2)
-        resp = ChangeFloorResponse()
+        with self.lock:
+            self.change_graph(req.floor)
+            self.publish_markers(action=2)
+            resp = ChangeFloorResponse()
         return resp
 
     def find_path_cb(self, req):
@@ -234,7 +237,7 @@ class SpotMapServer(object):
 
     def get_robotpose(self):
         try:
-            (trans,rot) = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
+            (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return False
         pose = Pose()
