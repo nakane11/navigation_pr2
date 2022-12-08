@@ -12,7 +12,7 @@ from tf.transformations import unit_vector as normalize_vector
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
 from jsk_recognition_utils.color import labelcolormap
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, PoseArray
 
 N = 256
 colors = labelcolormap(N=N) / 255.0
@@ -232,10 +232,20 @@ def changeOrientation(waypoints):
         if np.linalg.norm(v_ab) == 0.0:
             continue
         matrix = np.eye(4)
-        matrix[:3, :3] = rotation_matrix_from_axis(v_ab, axes="xz")
+        matrix[:3, :3] = rotation_matrix_from_axis(v_ab, axes="xy")
         q_xyzw = matrix2quaternion(matrix)
+        waypoints[i].pose.position.z = 0
         waypoints[i].pose.orientation.x = q_xyzw[0]
         waypoints[i].pose.orientation.y = q_xyzw[1]
         waypoints[i].pose.orientation.z = q_xyzw[2]
         waypoints[i].pose.orientation.w = q_xyzw[3]
     return waypoints
+
+def publish_waypoints(waypoints):
+    pose_array = PoseArray()
+    pose_array.header.frame_id = 'map'
+    array = []
+    for waypoint in waypoints:
+        array.append(waypoint.pose)
+    pose_array.poses = array
+    return pose_array

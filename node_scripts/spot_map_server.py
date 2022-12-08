@@ -28,6 +28,7 @@ class SpotMapServer(object):
         self.active_graph = nx.MultiGraph()
         self.active_graph_name = 'initial'
 
+        self.pose_pub = rospy.Publisher('waypoints', PoseArray, queue_size=1)
         self.listener = tf.TransformListener()
         self.node_pub = rospy.Publisher('~nodes', MarkerArray, queue_size=1)
         self.edge_pub = rospy.Publisher('~edges', MarkerArray, queue_size=1)        
@@ -41,6 +42,7 @@ class SpotMapServer(object):
         self.thread = threading.Thread(target=self._loop)
         self.thread.daemon = True  # terminate when main thread exit
         self.thread.start()
+        rospy.loginfo('initialized')
 
     def _loop(self):
         rate = rospy.Rate(10)
@@ -193,6 +195,7 @@ class SpotMapServer(object):
                             waypoints.append(node)
                 result_array.append(0)
                 waypoints = changeOrientation(waypoints)
+                self.pose_pub.publish(publish_waypoints(waypoints))
                 waypoints_array.extend(waypoints)
                 waypoints_length.append(len(waypoints))
 

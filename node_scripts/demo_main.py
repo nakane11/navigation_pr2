@@ -25,6 +25,7 @@ class NavigationSmach():
         ###################################
         ############  MAPPING  ############
         ###################################
+        print(0)
         con_mapping = smach.Concurrence(outcomes=['outcome', 'succeeded', 'start navigation'],
                                         default_outcome='outcome', 
                                         child_termination_cb = con_mapping_child_term_cb,
@@ -53,6 +54,7 @@ class NavigationSmach():
         ###################################
         ###########  NAVIGATION  ##########
         ###################################
+        print(1)
         sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'])
         with sm_navigation:
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
