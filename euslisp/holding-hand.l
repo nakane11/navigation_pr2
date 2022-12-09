@@ -1,22 +1,26 @@
 (ros::roseus-add-msgs "jsk_recognition_msgs")
 (ros::roseus-add-msgs "navigation_pr2")
 (load "package://pr2eus/pr2-interface.l")
+(load "package://navigation_pr2/euslisp/tuckarm-with-hand.l")
 
 (when (boundp '*tfl*)
   (setq *tfl* (instance ros::transform-listener :init)))
 
 (ros::roseus "move_wrist")
 (defun give-hand-pose (hand-coords)
-  (pr2-tuckarm-pose :larm :inside :single)
+  ;; (pr2-tuckarm-pose :larm :inside :single)
+  (pr2-tuckarm-pose)
   (send *ri* :go-pos-unsafe (/(- (elt (send hand-coords :pos) 0) -135) 1000) (/(+ (elt (send hand-coords :pos) 1) 679) 1000) (rad2deg pi))
   
-  (send *pr2* :larm :angle-vector #f(44.3333 36.9321 9.03022 -121.342 -133.409 -92.8499 -19.1599))
-  (send *pr2* :head :angle-vector #f(77.0 23.0))
+  ;; (send *pr2* :larm :angle-vector #f(44.3333 36.9321 9.03022 -121.342 -133.409 -92.8499 -19.1599))
+  (send *pr2* :larm :angle-vector #f(63.1013 37.3441 -37.2423 -117.344 -140.472 -114.592 49.8059))
+  (send *pr2* :head :angle-vector #f(77.0 38.0))
 
-  (setq hand-height (elt (send hand-coords :pos) 2))
-  (setq torso-height (+ 50.0 (/ (- hand-height 812.755) 10)))
-  (send *pr2* :torso :angle-vector (float-vector torso-height))
-
+  ;; (setq hand-height (elt (send hand-coords :pos) 2))
+  ;; (setq torso-height (+ 50.0 (/ (- hand-height 812.755) 10)))
+  ;; (send *pr2* :torso :angle-vector (float-vector torso-height))
+  (send *pr2* :torso :angle-vector #f(208.957))
+  
   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000)
   (send *ri* :wait-interpolation)
   t)
@@ -39,18 +43,6 @@
   nil)
 
 (pr2-init)
-;; (setq hand-coords nil)
-;; (setq start (ros::time-now))
-;; (while (or (null hand-coords)
-;;            (> (elt (send hand-coords :pos) 2) 1500))
-;;   (ros::spin-once)           
-;;   (ros::ros-info "cb")
-;;   (setq hand-coords (hand-pose-subscriber))
-;;   (when hand-coords
-;;     (ros::ros-info "~A" hand-coords)))
-;; (setq end (ros::time-now))
-;; (ros::ros-info (format nil "time: ~A" (send (ros::time- end start) :to-sec)))
-;; (give-hand-pose hand-coords)
 
 (defun execute-cb (server goal)
   (let ((hand-coords nil)
