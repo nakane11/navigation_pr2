@@ -21,10 +21,10 @@ class WaitforHandImpact(smach.State):
         self.count = 0
         
     def execute(self, userdata):
-        rospy.sleep(10)
+        rospy.sleep(0.8)
         goal = PR2GripperEventDetectorGoal()
         goal.command.trigger_conditions = pr2_gripper_sensor_msgs.msg.PR2GripperEventDetectorCommand.ACC
-        goal.command.acceleration_trigger_magnitude = 12.0
+        goal.command.acceleration_trigger_magnitude = 10.0
         self.ac.send_goal(goal)
         if self.ac.wait_for_result(timeout=rospy.Duration(8)):
             ret = self.ac.get_result()
@@ -33,7 +33,7 @@ class WaitforHandImpact(smach.State):
                 if self.count > 1:
                     return 'succeeded'
                 else:
-                    return 'detected'
+                    return 'succeeded'
             elif self.preempt_requested():
                 self.service_preempt()
                 return 'preempted'
@@ -64,8 +64,9 @@ class AskWhat(smach.State):
         speech_raw = rospy.get_param('~speech_raw')
         rospy.delete_param('~speech_raw')
         if re.findall('待って', speech_raw):
+            self.speak.say('わかりました')
             return 'interrupt'
-        return 'preeempted'
+        return 'preempted'
 
 class ChangeSpeed(smach.State):
     def __init__(self):

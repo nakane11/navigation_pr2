@@ -1,9 +1,21 @@
 <launch>
   <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
   <arg name="use_speaker" default="true" doc="Enable robot speaking" />
+  <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
+  <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
+  <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
 
   <include file="$(find navigation_pr2)/launch/speech_recognition.launch" >
     <arg name="use_vosk" value="$(arg use_vosk)" />
+  </include>
+
+  <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
+    <arg name="gui" value="false" />
+    <arg name="gpu" value="-1" />
+    <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
+    <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
+    <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
+    <arg name="with_depth" value="true" />
   </include>
 
   <group if="$(arg use_speaker)">
@@ -12,11 +24,6 @@
           respawn="true" >
     </node>
   </group>
-
-  <!-- <node pkg="roseus" type="roseus" name="spot_map_server" output="screen" -->
-  <!--       args="$(find navigation_pr2)/euslisp/spot-map-server.l" > -->
-  <!--   <param name="robot" value="pr2"/> -->
-  <!-- </node> -->
 
   <node name="spot_map_server"
         pkg="navigation_pr2" type="spot_map_server.py"

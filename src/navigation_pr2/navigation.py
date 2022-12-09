@@ -14,6 +14,7 @@ from pr2_mechanism_msgs.srv import SwitchController
 from navigation_pr2.srv import Path, ChangeFloor
 from navigation_pr2.utils import *
 from robothand.msg import StartHoldingAction, StartHoldingGoal
+from navigation_pr2.msg import MoveWristAction, MoveWristGoal
 from std_msgs.msg import Float32MultiArray
 import numpy as np
 
@@ -313,19 +314,31 @@ class FinishNavigation(smach.State):
 
 class StartNavigation(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['succeeded'])
+        smach.State.__init__(self, outcomes=['succeeded', 'timeout'])
         self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
         self.hand_client.wait_for_server()
+        self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
+        self.wrist_client.wait_for_server()
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.speak = client
 
     def execute(self, userdata):
+        self.speak.say('正面に立って下さい')
+        goal = MoveWristGoal()
+        self.wrist_client.send_goal(goal)
+        if not self.wrist_client.wait_for_result(timeout=rospy.Duration(40)):
+            self.wrist_client.cancel_all_goals()
+            self.speak.say('中断しました')
+            return 'timeout'
         self.speak.say('手を繋いで下さい')
         # 手繋ぎ
         goal = StartHoldingGoal(command=0)
         self.hand_client.send_goal(goal)
-        self.hand_client.wait_for_result()
+        if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
+            self.hand_client.cancel_all_goals()
+            self.speak.say('中断しました')
+            return 'timeout'
         print(self.hand_client.get_result())
         ret = self.controller([], ['l_arm_controller'], None)
         print(ret)
@@ -345,6 +358,8 @@ def con_moving_child_term_cb(outcome_map):
         return False
 
 def con_moving_out_cb(outcome_map):
+    if outcome_map['HAND_IMPACT'] == 'succeeded':
+        return 'ask'
     if outcome_map['SEND_WAYPOINT'] == 'succeeded':
         return 'reached'
     if outcome_map['TALK_IN_MOVING'] == 'succeeded':
@@ -355,8 +370,6 @@ def con_moving_out_cb(outcome_map):
         return 'aborted'
     if outcome_map['TALK_IN_MOVING'] == 'start mapping':
         return 'start mapping'
-    if outcome_map['HAND_IMPACT'] == 'succeeded':
-        return 'ask'
            
 
                               

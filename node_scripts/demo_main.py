@@ -114,7 +114,8 @@ class NavigationSmach():
                                                 'rejected all':'aborted'})
 
             smach.StateMachine.add('START_NAVIGATION', StartNavigation(client=self.speak),
-                                   transitions={'succeeded': 'MOVING'})
+                                   transitions={'succeeded': 'MOVING',
+                                                'timeout': 'aborted'})
             smach.StateMachine.add('MOVING', con_moving,
                                    transitions={'outcome':'MOVING',
                                                 'aborted':'FINISH_NAVIGATION',
