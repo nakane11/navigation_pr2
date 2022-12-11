@@ -74,6 +74,28 @@ class WaitForTeaching(smach.State):
         self.speak.parrot(speech_raw)
         return 'aborted'
 
+class StartMapping(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'])
+        rospy.loginfo('waiting for lead_pr2/start...')
+        rospy.wait_for_service('lead_pr2/start')
+        self.start = rospy.ServiceProxy('lead_pr2/start', Empty)
+
+    def execute(self, userdata):
+        self.start()
+        return 'succeeded'
+
+class FinishMapping(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'])
+        rospy.loginfo('waiting for lead_pr2/stop...')
+        rospy.wait_for_service('lead_pr2/stop')
+        self.stop = rospy.ServiceProxy('lead_pr2/stop', Empty)
+
+    def execute(self, userdata):
+        self.stop()
+        return 'succeeded'
+
 class SendWithName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])

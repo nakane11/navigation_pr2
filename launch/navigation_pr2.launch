@@ -1,6 +1,6 @@
 <launch>
   <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
-  <arg name="use_speaker" default="true" doc="Enable robot speaking" />
+  <arg name="speaker_volume" default="1.0" doc="robot speaking volume" />
   <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
   <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
   <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
@@ -8,6 +8,8 @@
   <include file="$(find navigation_pr2)/launch/speech_recognition.launch" >
     <arg name="use_vosk" value="$(arg use_vosk)" />
   </include>
+
+  <include file="$(find virtual_force_drag)/launch/pr2_lead.launch" />
 
   <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
     <arg name="gui" value="false" />
@@ -18,12 +20,13 @@
     <arg name="with_depth" value="true" />
   </include>
 
-  <group if="$(arg use_speaker)">
-    <node name="speak_node"
-          pkg="navigation_pr2" type="speak.py"
-          respawn="true" >
-    </node>
-  </group>
+  <node name="speak_node"
+        pkg="navigation_pr2" type="speak.py"
+        respawn="true" >
+    <rosparam subst_value="true">
+      volume: $(arg speaker_volume)
+    </rosparam>
+  </node>
 
   <node name="spot_map_server"
         pkg="navigation_pr2" type="spot_map_server.py"
