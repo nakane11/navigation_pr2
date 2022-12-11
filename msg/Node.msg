@@ -8,10 +8,11 @@ uint8 PEOPLE=6
 
 string name
 string floor
-# type of the node
-uint8 type
 # goal position
 geometry_msgs/Pose pose
+
+# type of the node
+uint8 type
 # threshold for moving
 float32 range
 # pause for some reason

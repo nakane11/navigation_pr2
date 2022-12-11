@@ -8,6 +8,7 @@ uint8 UPDATE_SPOT_INFO = 4
 uint8 command
 string name
 Node node
+string[] update_keys
 ---
 bool result
 ---

@@ -116,9 +116,9 @@ class SpotMapServer(object):
                 pose = self.get_robotpose()
                 if pose:
                     self.add_spot(pose, goal.name)
-                    self.update_spot_info(goal.name, goal.node)
+                    self.update_spot_info(goal.name, goal.node, goal.update_keys)
             elif goal.command == 4:
-                self.update_spot_info(goal.name, goal.node)
+                self.update_spot_info(goal.name, goal.node, goal.update_keys)
         result = RecordSpotResult()
         self.add.set_succeeded(result)
         return
@@ -227,13 +227,23 @@ class SpotMapServer(object):
         node_msg.keys = n['keys'] if 'keys' in n else []
         return node_msg
 
-    def update_spot_info(self, name, node_info):
-        self.active_graph.nodes[name]['type'] = node_info.type
-        self.active_graph.nodes[name]['range'] = node_info.range
-        self.active_graph.nodes[name]['wait'] = node_info.wait
-        self.active_graph.nodes[name]['description'] = node_info.description
-        self.active_graph.nodes[name]['read_out'] = node_info.read_out
-        self.active_graph.nodes[name]['keys'] = node_info.keys
+    def update_spot_info(self, name, node_info, update_keys):
+        rospy.loginfo("update {}'s info: {}".format(name, update_keys))
+        if not name in self.active_graph.nodes:
+            rospy.loginfo("{} does not exist in current graph".format(name))
+        for key in update_keys:
+            if key == 'type':
+                self.active_graph.nodes[name]['type'] = node_info.type
+            elif key == 'range':
+                self.active_graph.nodes[name]['range'] = node_info.range
+            elif key == 'wait':
+                self.active_graph.nodes[name]['wait'] = node_info.wait
+            elif key == 'description':
+                self.active_graph.nodes[name]['description'] = node_info.description
+            elif key == 'read_out':
+                self.active_graph.nodes[name]['read_out'] = node_info.read_out
+            elif key == 'keys':
+                self.active_graph.nodes[name]['keys'] = node_info.keys
 
     def get_robotpose(self):
         try:
