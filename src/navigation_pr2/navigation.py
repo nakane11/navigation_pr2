@@ -47,6 +47,7 @@ class GetWaypoints(smach.State):
                              input_keys=['goal_spot'],
                              output_keys=['waypoints', 'next_point', 'floor_candidates', 'path_candidates'])
         self.speak = client
+        rospy.loginfo('waiting for spot_map_server/find_path...')
         rospy.wait_for_service('/spot_map_server/find_path')
         self.call = rospy.ServiceProxy('/spot_map_server/find_path', Path)
 
@@ -165,7 +166,9 @@ class SuggestGoals(smach.State):
 class GetSpeechinMoving(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted', 'end', 'request interrupt', 'start mapping', 'aborted'])
+        rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('/spot_map_server/change_floor')
+        # rospy.loginfo('waiting for map_manager/change_floor...')
         # rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
@@ -300,7 +303,9 @@ class FinishNavigation(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+        rospy.loginfo('waiting for start_hand_holding...')
         self.hand_client.wait_for_server()
+        rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
 
@@ -316,9 +321,12 @@ class StartNavigation(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'timeout'])
         self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+        rospy.loginfo('waiting for start_hand_holding...')
         self.hand_client.wait_for_server()
         self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
+        rospy.loginfo('waiting for moving_wrist...')
         self.wrist_client.wait_for_server()
+        rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.speak = client

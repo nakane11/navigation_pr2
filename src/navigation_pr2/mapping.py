@@ -15,7 +15,9 @@ class WaitForTeaching(smach.State):
         smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name'])
         self.speak = client
+        rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
+        # rospy.loginfo('waiting for map_manager/change_floor...')
         # rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
@@ -76,11 +78,20 @@ class SendWithName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
+        rospy.loginfo('waiting for spot_map_server/add...')
         self.ac.wait_for_server()
 
     def execute(self, userdata):
         name = userdata.new_spot_name
         rospy.loginfo("add new spot: {}".format(name))
+        # if re.search(r'エレベータ(.*)$', name) is not None:
+        #     goal = RecordSpotGoal()
+        #     goal.command = 3
+        #     goal.name = name
+        #     goal.node.type = 1
+        #     self.ac.send_goal(goal)
+        #     return 'register elevator'
+
         goal = RecordSpotGoal()
         goal.command = 1
         goal.name = name
@@ -91,6 +102,7 @@ class SendCancelName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
+        rospy.loginfo('waiting for spot_map_server/add...')
         self.ac.wait_for_server()
 
     def execute(self, userdata):
@@ -102,8 +114,10 @@ class SendCancelName(smach.State):
 class SwitchRecordWithoutName(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted'])
+        rospy.loginfo('waiting for spot_map_server/start...')
         rospy.wait_for_service('spot_map_server/start')
         self.start = rospy.ServiceProxy('spot_map_server/start', Empty)
+        rospy.loginfo('waiting for spot_map_server/stop...')
         rospy.wait_for_service('spot_map_server/stop')
         self.stop = rospy.ServiceProxy('spot_map_server/stop', Empty)
 

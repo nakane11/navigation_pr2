@@ -15,6 +15,7 @@ class Idling(smach.State):
     def execute(self, userdata):
         if not wait_for_speech(timeout=30):
             return 'timeout'
+        # unicode -> str
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
         rospy.delete_param('~speech_raw')
         if re.search(r'.*案内.*$', speech_raw):
@@ -35,7 +36,8 @@ class Idling(smach.State):
 class Initialize(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)        
+        rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)
 
     def execute(self, userdata):
         self.dr.update_configuration({"acc_lim_x" : 2.0})
@@ -64,7 +66,7 @@ class Introduction(smach.State):
         rospy.delete_param('~speech_raw')
         if re.search(r'(.*)です.*$', speech_raw) is not None:
             person_name = re.search(r'(.*)です.*$', speech_raw).group(1)
-            userdata.person_name = person_name
+            userdata.person_name = person_name # str
             self.speak.say('{}さんですね。よろしくお願いします。'.format(person_name))
             return 'succeeded'
         return 'aborted'
@@ -72,7 +74,8 @@ class Introduction(smach.State):
 class Shutdown(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0)        
+        rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=5.0) 
 
     def execute(self, userdata):
         self.dr.update_configuration({"acc_lim_x" : 2.5})

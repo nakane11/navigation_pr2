@@ -17,6 +17,7 @@ class WaitforHandImpact(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'detected', 'preempted', 'aborted'])
         self.ac = actionlib.SimpleActionClient('/l_gripper_sensor_controller/event_detector', PR2GripperEventDetectorAction)
+        rospy.loginfo('waiting for l_gripper_sensor_controller/event_detector...')
         self.ac.wait_for_server()
         self.count = 0
         
