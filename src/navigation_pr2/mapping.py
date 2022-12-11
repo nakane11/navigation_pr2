@@ -12,8 +12,10 @@ from navigation_pr2.srv import ChangeFloor
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
-                             output_keys=['new_spot_name'])
+        smach.State.__init__(self, outcomes=['timeout', 'name received',\
+                                             'description received', 'end',\
+                                             'request navigation', 'aborted', 'cancelled'],
+                             output_keys=['new_spot_name', 'new_description'])
         self.speak = client
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
@@ -23,6 +25,7 @@ class WaitForTeaching(smach.State):
         # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
         # self.py_floor(command=0, floor='empty')
         self.initialized = False
+        self.last_spot_name = ''
 
     def execute(self, userdata):
         if not self.initialized:
@@ -51,8 +54,13 @@ class WaitForTeaching(smach.State):
         rospy.delete_param('~speech_raw')
         if re.search(r'.*ここが(.*)だよ$', speech_raw) is not None:
             userdata.new_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
+            self.last_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
             self.speak.say('{}というのですね'.format(re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)))
             return 'name received'
+        elif self.last_spot_name is not '':
+            if re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw) is not None:
+                userdata.new_description = re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw).group(1)
+                return 'description received'
         elif re.search(r'.*違い.*$', speech_raw) is not None:
             self.speak.say('失礼しました')
             return 'cancelled'
@@ -111,6 +119,7 @@ class SendWithName(smach.State):
         #     goal.command = 3
         #     goal.name = name
         #     goal.node.type = 1
+        #     goal.update_keys = ['type']
         #     self.ac.send_goal(goal)
         #     return 'register elevator'
 
@@ -119,6 +128,25 @@ class SendWithName(smach.State):
         goal.name = name
         self.ac.send_goal(goal)
         return 'send spot with name'
+
+class SendDescription(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'], input_keys=['new_spot_name', 'new_description'])
+        self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
+        rospy.loginfo('waiting for spot_map_server/add...')
+        self.ac.wait_for_server()
+
+    def execute(self, userdata):
+        name = userdata.new_spot_name
+        description = userdata.new_description
+        rospy.loginfo("add new description to {}: {}".format(name, description))
+        goal = RecordSpotGoal()
+        goal.command = 4
+        goal.name = name
+        goal.node.description = description
+        goal.update_keys = ['description']
+        self.ac.send_goal(goal)
+        return 'succeeded'
 
 class SendCancelName(smach.State):
     def __init__(self):
