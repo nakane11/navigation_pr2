@@ -2,6 +2,8 @@
 from sound_play.libsoundplay import SoundClient
 from std_msgs.msg import String
 import rospy
+from navigation_pr2.msg import SpeakAction, SpeakResult
+import actionlib
 
 class SpeakNode(object):
     def __init__(self):
@@ -15,6 +17,11 @@ class SpeakNode(object):
             rospy.logerr("{} is not supported".format(self.lang))
             return
         self.sub = rospy.Subscriber("~say", String, self.say)
+        self.ac = actionlib.SimpleActionServer('~say', SpeakAction, self.action_cb)
+
+    def action_cb(self, goal):
+        self.sound_client.say(goal.data, volume=self.volume)
+        self.ac.set_succeeded(SpeakResult())
 
     def say(self, msg):
         self.update_volume()
