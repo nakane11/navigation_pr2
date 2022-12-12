@@ -141,6 +141,7 @@ class NavigationSmach():
         ###################################
         ####### MAIN STATE MACHINE ########
         ###################################
+        print(2)
         sm = smach.StateMachine(outcomes=['succeeded', 'failed'])
         with sm:
             smach.StateMachine.add('INITIALIZE', Initialize(),

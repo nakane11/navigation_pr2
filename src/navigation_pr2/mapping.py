@@ -16,14 +16,16 @@ class WaitForTeaching(smach.State):
                                              'description received', 'end',\
                                              'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name', 'new_description'])
+        self.multiple_floor = rospy.get_param('~multiple_floor')
         self.speak = client
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
-        # rospy.loginfo('waiting for map_manager/change_floor...')
-        # rospy.wait_for_service('/map_manager/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
-        # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
-        # self.py_floor(command=0, floor='empty')
+        if self.multiple_floor:
+            rospy.loginfo('waiting for map_manager/change_floor...')
+            rospy.wait_for_service('/map_manager/change_floor')
+            self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+            self.py_floor(command=0, floor='empty')
         self.initialized = False
         self.last_spot_name = ''
 
@@ -40,7 +42,8 @@ class WaitForTeaching(smach.State):
                         self.speak.say('{}階ですね。ありがとうございます'.format(self.floor_name))
                         floor_name = floors[self.floor_name]
                         self.eus_floor(floor=floor_name)
-                        # self.py_floor(command=1, floor=floor_name)
+                        if self.multiple_floor:
+                            self.py_floor(command=1, floor=floor_name)
                         rospy.set_param('~floor', floor_name)
                         break
                 else:
@@ -69,13 +72,15 @@ class WaitForTeaching(smach.State):
             self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
             floor_name = floors[self.floor_name]
             self.eus_floor(floor=floor_name)
-            # self.py_floor(command=1, floor=floor_name)
+            if self.multiple_floor:
+                self.py_floor(command=1, floor=floor_name)
             rospy.set_param('~floor', floor_name)
             return 'aborted'
         elif re.findall('終了', speech_raw):
             print(self.floor_name)
             floor_name = floors[self.floor_name]
-            # self.py_floor(command=2, floor=floor_name)
+            if self.multiple_floor:
+                self.py_floor(command=2, floor=floor_name)
             return 'end'
         elif re.findall('案内', speech_raw):
             return 'request navigation'

@@ -34,6 +34,10 @@
         clear_params="true" >
   </node>
 
+  <node pkg="roseus" type="roseus" name="move_wrist"
+        args="$(find navigation_pr2)/euslisp/holding-hand.l" >
+  </node>
+
   <node name="republish_conversation"
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen"
