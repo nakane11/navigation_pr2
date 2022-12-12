@@ -20,6 +20,7 @@ class SpeakNode(object):
         self.ac = actionlib.SimpleActionServer('~say', SpeakAction, self.action_cb)
 
     def action_cb(self, goal):
+        self.update_volume()
         self.sound_client.say(goal.data, volume=self.volume)
         self.ac.set_succeeded(SpeakResult())
 

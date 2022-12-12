@@ -91,7 +91,7 @@ class SpotMapServer(object):
             id += 1
         id = 1
         edge_array_msg = MarkerArray()
-        for edge in list(self.active_graph.edges):
+        for edge in list(self.active_graph.edges()):
             p1 = self.active_graph.nodes[edge[0]]['pose']
             p2 = self.active_graph.nodes[edge[1]]['pose']
             l = make_line_marker(p1, p2, id, rospy.Time.now(), color=(1,0,0))
