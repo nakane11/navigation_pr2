@@ -51,6 +51,7 @@ class SpotMapServer(object):
             if self.auto_map_enabled:
                 curr_pose = self.get_robotpose()
                 if not curr_pose:
+                    rospy.loginfo('failed to get pose')
                     return
                 with self.lock:
                     # 前のノードがなかった場合に追加
@@ -106,10 +107,14 @@ class SpotMapServer(object):
                 pose = self.get_robotpose()
                 if pose:
                     self.add_spot(pose)
+                else:
+                    rospy.loginfo('failed to get pose')
             elif goal.command == 1:
                 pose = self.get_robotpose()
                 if pose:
                     self.add_spot(pose, goal.name)
+                else:
+                    rospy.loginfo('failed to get pose')
             elif goal.command == 2:
                 self.remove_spot(name)
             elif goal.command == 3:
@@ -117,6 +122,8 @@ class SpotMapServer(object):
                 if pose:
                     self.add_spot(pose, goal.name)
                     self.update_spot_info(goal.name, goal.node, goal.update_keys)
+                else:
+                    rospy.loginfo('failed to get pose')
             elif goal.command == 4:
                 self.update_spot_info(goal.name, goal.node, goal.update_keys)
         result = RecordSpotResult()

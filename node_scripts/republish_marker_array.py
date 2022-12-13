@@ -26,10 +26,12 @@ class RepublishMarkerArray(ConnectionBasedTransport):
         self.sub.unregister()
 
     def _cb(self, msg):
+        print("hoge")
         marker_array = MarkerArray()
         markers = []
         for marker in msg.markers:
             if marker.type == 9:
+                print(marker.text, type(marker.text))
                 marker.text = self.converter.do(marker.text)
             markers.append(marker)
         marker_array.markers = markers
