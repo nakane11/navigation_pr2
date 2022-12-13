@@ -1,5 +1,5 @@
 (load "package://pr2eus/pr2-interface.l")
-(defconstant *pr2-tuckarm-pose-larm-free* (list #f(10.9964 63.8568 73.353 -113.496 5.90481 -92.0995 -23.1082)
+(setq *pr2-tuckarm-pose-larm-free* (list #f(10.9964 63.8568 73.353 -113.496 5.90481 -92.0995 -23.1082)
                                                 #f(-6.6127 60.5828 -122.994 -74.8254 56.2071 -5.72958 10.8427)))
 
 (defun pr2-tuckarm-pose (&optional free-arm (arm-side :both))
