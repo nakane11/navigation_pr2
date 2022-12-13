@@ -9,6 +9,7 @@ from std_srvs.srv import Empty
 from navigation_pr2.utils import *
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from navigation_pr2.srv import ChangeFloor
+from virtual_force_drag.msg import SwitchAction, SwitchGoal
 
 class WaitForTeaching(smach.State):
     def __init__(self, client):
@@ -90,23 +91,25 @@ class WaitForTeaching(smach.State):
 class StartMapping(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        rospy.loginfo('waiting for lead_pr2/start...')
-        rospy.wait_for_service('lead_pr2/start')
-        self.start = rospy.ServiceProxy('lead_pr2/start', Empty)
+        self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
+        rospy.loginfo('waiting for lead_pr2_action...')
+        self.ac.wait_for_server()
 
     def execute(self, userdata):
-        self.start()
+        goal = SwitchGoal(switch=True)
+        self.ac.send_goal(goal)
         return 'succeeded'
 
 class FinishMapping(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        rospy.loginfo('waiting for lead_pr2/stop...')
-        rospy.wait_for_service('lead_pr2/stop')
-        self.stop = rospy.ServiceProxy('lead_pr2/stop', Empty)
+        self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
+        rospy.loginfo('waiting for lead_pr2_action...')
+        self.ac.wait_for_server()
 
     def execute(self, userdata):
-        self.stop()
+        goal = SwitchGoal(switch=False)
+        self.ac.send_goal(goal)
         return 'succeeded'
 
 class SendWithName(smach.State):
