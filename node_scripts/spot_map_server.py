@@ -255,7 +255,8 @@ class SpotMapServer(object):
     def get_robotpose(self):
         try:
             (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        except Exception as e:
+            rospy.logerr(e)
             return False
         pose = Pose()
         pose.position.x = trans[0]
