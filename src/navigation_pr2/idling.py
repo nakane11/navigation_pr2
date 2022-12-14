@@ -6,10 +6,11 @@ import smach
 import re
 import dynamic_reconfigure.client
 from navigation_pr2.utils import *
+from navigation_pr2.srv import ListSpotName
 
 class Idling(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['timeout', 'start navigation', 'start mapping', 'end', 'aborted', 'intro'])
+        smach.State.__init__(self, outcomes=['timeout', 'start navigation', 'start mapping', 'end', 'aborted', 'intro', 'list spots'])
         self.speak = client
 
     def execute(self, userdata):
@@ -20,18 +21,17 @@ class Idling(smach.State):
         rospy.delete_param('~speech_raw')
         if re.search(r'.*案内.*$', speech_raw):
             return 'start navigation'
-        elif re.search(r'.*覚え.*$', speech_raw):
+        if re.search(r'.*覚え.*$', speech_raw):
            return 'start mapping'
-        elif re.search(r'.*終了.*$', speech_raw):
+        if re.search(r'.*終了.*$', speech_raw):
             return 'end'
-        elif re.search(r'.*こんにちは.*$', speech_raw):
+        if re.search(r'.*こんにちは.*$', speech_raw):
             self.speak.say('こんにちは。私はPR2です。')
             return 'intro'
-        else:
-            self.speak.parrot(speech_raw)
-            return 'aborted'
-
-        return 'start mapping'
+        if re.search(r'.*どこに.*$', speech_raw):
+            return 'list spots'
+        self.speak.parrot(speech_raw)
+        return 'aborted'
 
 class Initialize(smach.State):
     def __init__(self):
@@ -81,6 +81,22 @@ class Shutdown(smach.State):
         self.dr.update_configuration({"acc_lim_x" : 2.5})
         self.dr.update_configuration({"acc_lim_y" : 2.5})        
         self.dr.update_configuration({"acc_lim_theta" : 5.0})
+        return 'succeeded'
+
+class ListSpots(smach.State):
+    def __init__(self, client):
+        smach.State.__init__(self, outcomes=['succeeded'])
+        self.speak = client
+        rospy.loginfo('waiting for spot_map_server/list_spots...')
+        rospy.wait_for_service('spot_map_server/list_spots')
+        self.srv = rospy.ServiceProxy('spot_map_server/list_spots', ListSpotName)
+
+    def execute(self, userdata):
+        resp = self.srv()
+        self.speak.say('案内できる場所を読み上げます')
+        for p in resp.names:
+            self.speak.say(p)
+        self.speak.say('以上です')
         return 'succeeded'
 
 # wait
