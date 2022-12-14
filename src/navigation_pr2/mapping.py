@@ -144,11 +144,12 @@ class FinishMapping(smach.State):
         return 'succeeded'
 
 class SendWithName(smach.State):
-    def __init__(self):
+    def __init__(self, client):
         smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
         rospy.loginfo('waiting for spot_map_server/add...')
         self.ac.wait_for_server()
+        self.speak = client
 
     def execute(self, userdata):
         name = userdata.new_spot_name
@@ -166,6 +167,20 @@ class SendWithName(smach.State):
         goal.command = 1
         goal.name = name
         self.ac.send_goal(goal)
+        self.ac.wait_for_result()
+        result = self.ac.get_result().result
+        flag = True
+        while result is False:
+            if flag:
+                self.speak.say('位置を確認するので待って下さい')
+                flag = False
+            self.ac.send_goal(goal)
+            self.ac.wait_for_result()
+            print(self.ac.get_result())
+            result = self.ac.get_result().result
+            rospy.loginfo('wait for transform')
+            if result:
+                self.speak.say('記録しました')
         return 'send spot with name'
 
 class SendDescription(smach.State):

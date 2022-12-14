@@ -42,7 +42,7 @@ class NavigationSmach():
                                                     'request navigation':'request navigation',
                                                     'aborted':'WAIT_FOR_TEACHING',
                                                     'cancelled':'SEND_CANCEL_NAME'})
-                smach.StateMachine.add('SEND_WITH_NAME', SendWithName(),
+                smach.StateMachine.add('SEND_WITH_NAME', SendWithName(client=self.speak),
                                        transitions={'send spot with name':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SEND_DESCRIPTION', SendDescription(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
