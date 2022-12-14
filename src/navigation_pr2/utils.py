@@ -17,7 +17,8 @@ from geometry_msgs.msg import Point, PoseArray
 N = 256
 colors = labelcolormap(N=N) / 255.0
 
-floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9'}
+floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9', \
+          '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9'}
 
 def wait_for_speech(timeout=0):
     start_time = rospy.Time.now()

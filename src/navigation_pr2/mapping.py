@@ -54,12 +54,14 @@ class WaitForTeaching(smach.State):
                         floor_name = floors[self.floor_name]
                         self.eus_floor(floor=floor_name)
                         if self.multiple_floor:
+                            self.speak.say('地図を作るのでそのままお待ち下さい')
                             goal = ChangeFloorGoal()
                             goal.command = 1
                             goal.floor = floor_name
                             self.ac.send_goal(goal)
                             rospy.loginfo('waiting for change_floor result...')
                             self.ac.wait_for_result()
+                            self.speak.say('準備完了です')
                             # self.py_floor(command=1, floor=floor_name)
                         rospy.set_param('~floor', floor_name)
                         break
@@ -72,19 +74,7 @@ class WaitForTeaching(smach.State):
             return 'timeout'
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
         rospy.delete_param('~speech_raw')
-        if re.search(r'.*ここが(.*)だよ$', speech_raw) is not None:
-            userdata.new_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
-            self.last_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
-            self.speak.say('{}というのですね'.format(re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)))
-            return 'name received'
-        elif self.last_spot_name is not '':
-            if re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw) is not None:
-                userdata.new_description = re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw).group(1)
-                return 'description received'
-        elif re.search(r'.*違い.*$', speech_raw) is not None:
-            self.speak.say('失礼しました')
-            return 'cancelled'
-        elif re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+        if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
             self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
             self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
             floor_name = floors[self.floor_name]
@@ -96,10 +86,23 @@ class WaitForTeaching(smach.State):
                 self.ac.send_goal(goal)
                 rospy.loginfo('waiting for change_floor result...')
                 self.ac.wait_for_result()
+                self.speak.say('お待たせしました。{}階の地図を用意しました'.format(self.floor_name))
                 # self.py_floor(command=1, floor=floor_name)
             rospy.set_param('~floor', floor_name)
             return 'aborted'
-        elif re.findall('終了', speech_raw):
+        if re.search(r'.*ここが(.*)だよ$', speech_raw) is not None:
+            userdata.new_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
+            self.last_spot_name = re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)
+            self.speak.say('{}というのですね'.format(re.search(r'ここが(.*)だよ.*$', speech_raw).group(1)))
+            return 'name received'
+        if self.last_spot_name is not '':
+            if re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw) is not None:
+                userdata.new_description = re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw).group(1)
+                return 'description received'
+        if re.search(r'.*違い.*$', speech_raw) is not None:
+            self.speak.say('失礼しました')
+            return 'cancelled'
+        if re.findall('終了', speech_raw):
             print(self.floor_name)
             floor_name = floors[self.floor_name]
             if self.multiple_floor:
@@ -111,7 +114,7 @@ class WaitForTeaching(smach.State):
                 self.ac.wait_for_result()
                 # self.py_floor(command=2, floor=floor_name)
             return 'end'
-        elif re.findall('案内', speech_raw):
+        if re.findall('案内', speech_raw):
             return 'request navigation'
         self.speak.parrot(speech_raw)
         return 'aborted'

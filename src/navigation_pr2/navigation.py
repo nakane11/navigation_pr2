@@ -182,17 +182,19 @@ class GetSpeechinMoving(smach.State):
         rospy.delete_param('~speech_raw')
         if re.search(r'^.*待って.*$', speech_raw) is not None:
             return 'request interrupt'
-        elif re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+        if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
             floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
-            self.speak.say('{}階ですね'.format(floor_name))
+            self.speak.say('{}階ですね。'.format(floor_name))
             self.eus_floor(floor=floor_name)
             if self.multiple_floor:
+                self.speak.say('地図を変えるので待って下さい')
                 goal = ChangeFloorGoal()
                 goal.command = 1
                 goal.floor = floor_name
                 self.ac.send_goal(goal)
                 rospy.loginfo('waiting for change_floor result...')
                 self.ac.wait_for_result()
+                self.speak.say('準備が出来ました')
                 # self.py_floor(command=1, floor=floor_name)
             rospy.set_param('~floor', floor_name)
             return 'aborted'
