@@ -69,6 +69,7 @@ add_action_files(
   RecordSpot.action
   MoveWrist.action
   Speak.action
+  ChangeFloor.action
 )
 
 ## Generate added messages and services with any dependencies listed here

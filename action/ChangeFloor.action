@@ -1,0 +1,9 @@
+uint8 START_MAKE_MAP=0
+uint8 CHANGE_MAKE_MAP=1
+uint8 STOP_MAKE_MAP=2
+uint8 CHANGE_FLOOR=3
+
+uint8 command
+string floor
+---
+---
