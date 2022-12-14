@@ -16,6 +16,7 @@ from navigation_pr2.msg import RecordSpotAction, RecordSpotResult
 from navigation_pr2.srv import ChangeFloor, ChangeFloorResponse
 from navigation_pr2.srv import Path, PathResponse
 from navigation_pr2.msg import Node
+from navigation_pr2.srv import ListSpotName, ListSpotNameResponse
 
 
 class SpotMapServer(object):
@@ -36,6 +37,7 @@ class SpotMapServer(object):
         self.stop = rospy.Service('~stop', Empty, self.stop_auto_map)
         self.floor = rospy.Service('~change_floor', ChangeFloor, self.change_floor_cb)
         self.find_path = rospy.Service('~find_path', Path, self.find_path_cb)
+        self.lsn = rospy.Service('~list_spots', ListSpotName, self.list_spot_name)
         self.add = actionlib.SimpleActionServer('~add', RecordSpotAction, execute_cb=self.add_spot_cb)
         self.add.start()
 
@@ -79,6 +81,24 @@ class SpotMapServer(object):
         self.auto_map_enabled = False
         rospy.loginfo('auto map disabled')        
         return EmptyResponse()
+
+    def list_spot_name(self, req):
+        name_list = []
+        floor_list = []
+        for floor_name, graph in self.graph_dict.items():
+            for node_name in list(graph.nodes):
+                if 'name' in graph.nodes[node_name] and graph.nodes[node_name]['name'] is True:
+                    name_list.append(node_name)
+                    floor_list.append(floor_name)
+        for node_name in list(self.active_graph.nodes):
+            if 'name' in self.active_graph.nodes[node_name] and self.active_graph.nodes[node_name]['name'] is True:
+                name_list.append(node_name)
+                floor_list.append(self.active_graph_name)
+
+        resp = ListSpotNameResponse()
+        resp.names = name_list
+        resp.floors = floor_list
+        return resp
 
     def publish_markers(self, action=0):
         node_array_msg = MarkerArray()
