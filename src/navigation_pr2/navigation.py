@@ -12,6 +12,7 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import PoseStamped
 from pr2_mechanism_msgs.srv import SwitchController
 from navigation_pr2.srv import Path, ChangeFloor
+from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
 from navigation_pr2.utils import *
 from robothand.msg import StartHoldingAction, StartHoldingGoal
 from navigation_pr2.msg import MoveWristAction, MoveWristGoal
@@ -164,9 +165,12 @@ class GetSpeechinMoving(smach.State):
         rospy.wait_for_service('/spot_map_server/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         if self.multiple_floor:
+            # rospy.loginfo('waiting for map_manager/change_floor...')
+            # rospy.wait_for_service('/map_manager/change_floor')
+            # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+            self.ac = actionlib.SimpleActionClient('map_manager/change_floor', ChangeFloorAction)
             rospy.loginfo('waiting for map_manager/change_floor...')
-            rospy.wait_for_service('/map_manager/change_floor')
-            self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
+            self.ac.wait_for_server()
 
     def execute(self, userdata):
         if not wait_for_speech(timeout=5):
@@ -183,7 +187,13 @@ class GetSpeechinMoving(smach.State):
             self.speak.say('{}階ですね'.format(floor_name))
             self.eus_floor(floor=floor_name)
             if self.multiple_floor:
-                self.py_floor(command=1, floor=floor_name)
+                goal = ChangeFloorGoal()
+                goal.command = 1
+                goal.floor = floor_name
+                self.ac.send_goal(goal)
+                rospy.loginfo('waiting for change_floor result...')
+                self.ac.wait_for_result()
+                # self.py_floor(command=1, floor=floor_name)
             rospy.set_param('~floor', floor_name)
             return 'aborted'
         return 'aborted'

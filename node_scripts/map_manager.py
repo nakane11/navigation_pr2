@@ -17,8 +17,10 @@ except ImportError:
 import rospy
 import math
 import tf
+import actionlib
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from navigation_pr2.srv import *
+from navigation_pr2.msg import ChangeFloorAction, ChangeFloorResult
 
 
 class RobotService(object):
@@ -99,7 +101,8 @@ class MapManager(object):
         rospy.on_shutdown(self.handler)
         self.listener = tf.TransformListener()
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
-        rospy.Service('~change_floor', ChangeFloor, self.floor_cb)
+        # rospy.Service('~change_floor', ChangeFloor, self.floor_cb)
+        self.ac = actionlib.SimpleActionServer('~change_floor', ChangeFloorAction, self.floor_cb)
 
     def handler(self):
         try:
@@ -108,16 +111,26 @@ class MapManager(object):
         except:
             pass
 
-    def floor_cb(self, req):
-        if req.command == 0:
-            self.start_make_map(req.floor)
-        elif req.command == 1:
-            self.change_make_map(req.floor)
-        elif req.command == 2:
+     # def floor_cb(self, req):
+     #    if req.command == 0:
+     #        self.start_make_map(req.floor)
+     #    elif req.command == 1:
+     #        self.change_make_map(req.floor)
+     #    elif req.command == 2:
+     #        self.stop_make_map()
+     #    elif req.command == 3:
+     #        self.change_floor(req.floor)
+     #    return ChangeFloorResponse()
+    def floor_cb(self, goal):
+        if goal.command == 0:
+            self.start_make_map(goal.floor)
+        elif goal.command == 1:
+            self.change_make_map(goal.floor)
+        elif goal.command == 2:
             self.stop_make_map()
-        elif req.command == 3:
-            self.change_floor(req.floor)
-        return ChangeFloorResponse()
+        elif goal.command == 3:
+            self.change_floor(goal.floor)
+        self.ac.set_succeeded(ChangeFloorResult())
 
     def set_current_floor(self, floor):
         self.current_floor = floor
@@ -136,7 +149,10 @@ class MapManager(object):
         while not os.path.exists(filepath):
             continue
         rospy.loginfo('Successfully saved {}!'.format(filepath))
-        trans, rot = self.get_robotpose()
+        a = None
+        while a is None:
+            a = self.get_robotpose()
+        trans, rot = a
         self.stop_multirobot_map_merge(self.current_floor)
         self.stop_gmapping()
         self.stop_tf_publisher()
@@ -147,7 +163,10 @@ class MapManager(object):
         self.set_current_floor(floor)
 
     def stop_make_map(self):
-        trans, rot = self.get_robotpose()
+        a = None
+        while a is None:
+            a = self.get_robotpose()
+        trans, rot = a
         filepath = self.start_map_saver(self.current_floor) + '.yaml'
         while not os.path.exists(filepath):
             continue
@@ -161,7 +180,10 @@ class MapManager(object):
         self.publish_initialpose(trans, rot)
 
     def change_floor(self, floor):
-        trans, rot = self.get_robotpose()
+        a = None
+        while a is None:
+            a = self.get_robotpose()
+        trans, rot = a
         # self.stop_map_server()
         self.stop_multirobot_map_merge(self.current_floor)  
         # self.start_map_server(floor)
