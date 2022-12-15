@@ -14,7 +14,7 @@ class Idling(smach.State):
         self.speak = client
 
     def execute(self, userdata):
-        if not wait_for_speech(timeout=30):
+        if not wait_for_speech(timeout=50):
             return 'timeout'
         # unicode -> str
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
@@ -28,7 +28,7 @@ class Idling(smach.State):
         if re.search(r'.*こんにちは.*$', speech_raw):
             self.speak.say('こんにちは。私はPR2です。')
             return 'intro'
-        if re.search(r'.*どこに.*$', speech_raw):
+        if re.search(r'.*どこに行け.*$', speech_raw):
             return 'list spots'
         self.speak.parrot(speech_raw)
         return 'aborted'
@@ -93,9 +93,16 @@ class ListSpots(smach.State):
 
     def execute(self, userdata):
         resp = self.srv()
+        if resp.names == []:
+            self.speak.say('どこにも行けません')
+            return 'succeeded'
         self.speak.say('案内できる場所を読み上げます')
-        for p in resp.names:
-            self.speak.say(p)
+        floor = ''
+        for n, f in zip(resp.names, resp.floors):
+            if f != floor:
+                self.speak.say('{}階の'.format(f))
+                floor = f
+            self.speak.say(n)
         self.speak.say('以上です')
         return 'succeeded'
 
