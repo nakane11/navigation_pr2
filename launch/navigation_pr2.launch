@@ -22,7 +22,7 @@
 
   <node name="republish_marker_array"
   pkg="navigation_pr2_3rdparty" type="republish_marker_array.py"
-  output="screen"
+  output="screen" respawn="true"
   clear_params="true" >
   <remap from="~input" to="/spot_map_server/nodes" />
   <remap from="~output" to="/spot_map_server/nodes_republish" />
@@ -65,14 +65,19 @@
     </rosparam>
   </node>
 
+  <node name="map_manager"
+  pkg="navigation_pr2" type="map_manager.py"
+  output="screen"
+  clear_params="true" >
+  </node>
 
-  <node pkg="roseus" type="roseus" name="move_wrist"
+  <node pkg="roseus" type="roseus" name="move_wrist" respawn="true"
         args="$(find navigation_pr2)/euslisp/holding-hand.l" >
   </node>
 
   <node name="republish_conversation"
         pkg="navigation_pr2" type="republish_conversation.py"
-        output="screen"
+        output="screen" respawn="true"
         clear_params="true" >
     <remap from="~input1" to="/Tablet/voice" />
     <!-- <remap from="~input2" to="/robotsound_jp/goal" />  -->

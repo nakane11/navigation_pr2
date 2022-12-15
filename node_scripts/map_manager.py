@@ -111,16 +111,6 @@ class MapManager(object):
         except:
             pass
 
-     # def floor_cb(self, req):
-     #    if req.command == 0:
-     #        self.start_make_map(req.floor)
-     #    elif req.command == 1:
-     #        self.change_make_map(req.floor)
-     #    elif req.command == 2:
-     #        self.stop_make_map()
-     #    elif req.command == 3:
-     #        self.change_floor(req.floor)
-     #    return ChangeFloorResponse()
     def floor_cb(self, goal):
         if goal.command == 0:
             self.start_make_map(goal.floor)
@@ -137,8 +127,8 @@ class MapManager(object):
         rospy.set_param('/current_floor', floor)
 
     def start_make_map(self, floor):
-        # self.stop_map_server()
-        self.stop_multirobot_map_merge(self.current_floor)
+        self.stop_map_server()
+        # self.stop_multirobot_map_merge(self.current_floor)
         self.stop_amcl()
         self.start_tf_publisher(floor)
         self.start_gmapping(floor)
@@ -153,11 +143,11 @@ class MapManager(object):
         while a is None:
             a = self.get_robotpose()
         trans, rot = a
-        self.stop_multirobot_map_merge(self.current_floor)
+        # self.stop_multirobot_map_merge(self.current_floor)
         self.stop_gmapping()
         self.stop_tf_publisher()
         self.start_tf_publisher(floor)
-        self.start_multirobot_map_merge(floor, trans, rot)
+        # self.start_multirobot_map_merge(floor, trans, rot)
         # self.set_initialpose(trans, rot)
         self.start_gmapping(floor)
         self.set_current_floor(floor)
@@ -171,10 +161,10 @@ class MapManager(object):
         while not os.path.exists(filepath):
             continue
         rospy.loginfo('Successfully saved {}!'.format(filepath))
-        self.stop_multirobot_map_merge(self.current_floor)
+        # self.stop_multirobot_map_merge(self.current_floor)
         self.stop_gmapping()
-        self.start_multirobot_map_merge(self.current_floor, trans, rot)
-        # self.start_map_server(self.current_floor)
+        # self.start_multirobot_map_merge(self.current_floor, trans, rot)
+        self.start_map_server(self.current_floor)
         self.start_amcl()
         time.sleep(15)
         self.publish_initialpose(trans, rot)
@@ -184,10 +174,10 @@ class MapManager(object):
         while a is None:
             a = self.get_robotpose()
         trans, rot = a
-        # self.stop_map_server()
-        self.stop_multirobot_map_merge(self.current_floor)  
-        # self.start_map_server(floor)
-        self.start_multirobot_map_merge(floor, trans, rot)
+        self.stop_map_server()
+        # self.stop_multirobot_map_merge(self.current_floor)
+        self.start_map_server(floor)
+        # self.start_multirobot_map_merge(floor, trans, rot)
         # self.set_initialpose(trans, rot)
         self.set_current_floor(floor)
 
@@ -216,12 +206,12 @@ class MapManager(object):
         print(msg)
         self.initialpose.publish(msg)
 
-    def set_initialpose_param(self, ns, trans, rot):
-        euler = tf.transformations.euler_from_quaternion(rot)
-        rospy.set_param('{}/map_merge/init_pose_x'.format(ns), trans[0])
-        rospy.set_param('{}/map_merge/init_pose_y'.format(ns), trans[1])
-        rospy.set_param('{}/map_merge/init_pose_z'.format(ns), trans[2])
-        rospy.set_param('{}/map_merge/init_pose_yaw'.format(ns), euler[2])
+    # def set_initialpose_param(self, ns, trans, rot):
+    #     euler = tf.transformations.euler_from_quaternion(rot)
+    #     rospy.set_param('{}/map_merge/init_pose_x'.format(ns), trans[0])
+    #     rospy.set_param('{}/map_merge/init_pose_y'.format(ns), trans[1])
+    #     rospy.set_param('{}/map_merge/init_pose_z'.format(ns), trans[2])
+    #     rospy.set_param('{}/map_merge/init_pose_yaw'.format(ns), euler[2])
 
     # make /map of /map frame
     def start_gmapping(self, floor):
@@ -243,8 +233,7 @@ class MapManager(object):
         package = 'map_server'
         executable = 'map_saver'
         name = 'map_saver_{}'.format(floor)
-        filename = '{}/{}_{}'.format(self.dir_path, floor, datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        # args=['-f', '/tmp/raw_maps/{}'.format(floor)]
+        filename = '{}/{}'.format(self.dir_path, floor)
         args=['-f', filename]
         saver = self.rs.launch_node(package, executable, name, args=args, wait=False)
         self.procs['saver'] = saver
@@ -255,51 +244,51 @@ class MapManager(object):
             self.rs.term_node(self.procs['saver'])
 
     # serve /map topic of /map frame from 6f.yaml
-    # def start_map_server(self, floor):
-    #     print(floor)
-    #     package = 'map_server'
-    #     executable = 'map_server'
-    #     name = 'map_server_{}'.format(floor)
-    #     args=['/tmp/raw_maps/{}.yaml'.format(floor)]
-    #     server = self.rs.launch_node(package, executable, name, args=args)
-    #     self.procs['server'] = server
-
-    # def stop_map_server(self):
-    #     if 'server' in self.procs:
-    #         self.rs.term_node(self.procs['server'])
-
-    def start_multirobot_map_merge(self, floor, trans, rot):
+    def start_map_server(self, floor):
         print(floor)
-        package = 'multirobot_map_merge'
-        executable = 'map_merge'
-        name = 'map_merge_{}'.format(floor)
-        args=['_merged_map_topic:=/map', '_known_init_poses:=true', '_world_frame:=map']
-        multirobot_map_merge = self.rs.launch_node(package, executable, name, args=args)
-        self.procs['multirobot_map_merge'] = multirobot_map_merge
-        for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
-            fname = os.path.basename(os.path.splitext(yaml)[0])
-            self.start_child_map_server(floor, fname, trans, rot)
-
-    def stop_multirobot_map_merge(self, floor):
-        if 'multirobot_map_merge' in self.procs:
-            self.rs.term_node(self.procs['multirobot_map_merge'])
-        for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
-            fname = os.path.splitext(yaml)[0]
-
-            self.stop_child_map_server(fname)
-
-    def start_child_map_server(self, floor, fname, trans, rot):
-        self.set_initialpose_param('/{}/{}'.format(floor, fname), trans, rot)
         package = 'map_server'
         executable = 'map_server'
-        name = 'map_server_{}'.format(fname)
-        args=['{}/{}.yaml'.format(self.dir_path, fname), 'map:=/{}/{}/map'.format(floor, fname)]
+        name = 'map_server_{}'.format(floor)
+        args=['{}/{}.yaml'.format(self.dir_path, floor)]
         server = self.rs.launch_node(package, executable, name, args=args)
-        self.procs['{}'.format(fname)] = server
+        self.procs['server'] = server
 
-    def stop_child_map_server(self, fname):
-        if fname in self.procs:
-            self.rs.term_node(self.procs[fname])
+    def stop_map_server(self):
+        if 'server' in self.procs:
+            self.rs.term_node(self.procs['server'])
+
+    # def start_multirobot_map_merge(self, floor, trans, rot):
+    #     print(floor)
+    #     package = 'multirobot_map_merge'
+    #     executable = 'map_merge'
+    #     name = 'map_merge_{}'.format(floor)
+    #     args=['_merged_map_topic:=/map', '_known_init_poses:=true', '_world_frame:=map']
+    #     multirobot_map_merge = self.rs.launch_node(package, executable, name, args=args)
+    #     self.procs['multirobot_map_merge'] = multirobot_map_merge
+    #     for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
+    #         fname = os.path.basename(os.path.splitext(yaml)[0])
+    #         self.start_child_map_server(floor, fname, trans, rot)
+
+    # def stop_multirobot_map_merge(self, floor):
+    #     if 'multirobot_map_merge' in self.procs:
+    #         self.rs.term_node(self.procs['multirobot_map_merge'])
+    #     for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
+    #         fname = os.path.splitext(yaml)[0]
+
+    #         self.stop_child_map_server(fname)
+
+    # def start_child_map_server(self, floor, fname, trans, rot):
+    #     self.set_initialpose_param('/{}/{}'.format(floor, fname), trans, rot)
+    #     package = 'map_server'
+    #     executable = 'map_server'
+    #     name = 'map_server_{}'.format(fname)
+    #     args=['{}/{}.yaml'.format(self.dir_path, fname), 'map:=/{}/{}/map'.format(floor, fname)]
+    #     server = self.rs.launch_node(package, executable, name, args=args)
+    #     self.procs['{}'.format(fname)] = server
+
+    # def stop_child_map_server(self, fname):
+    #     if fname in self.procs:
+    #         self.rs.term_node(self.procs[fname])
 
     # publish /world->/6f and /6f->/map tf
     def start_tf_publisher(self, floor):
