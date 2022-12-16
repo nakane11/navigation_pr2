@@ -220,7 +220,7 @@ class MapManager(object):
         name = 'slam_gmapping_{}'.format(floor)
         args=['_odom_frame:=odom_combined', '_map_frame:=/map',
               '_xmin:=-30.0', '_ymin:=-30.0', '_xmax:=30.0', '_ymax:=30.0']
-        remap_args = {'scan':'base_scan'}
+        remap_args = {'scan':'base_scan_filtered_mux/scan'}
         gmapping = self.rs.launch_node(package, executable, name, args=args, remap=remap_args)
         self.procs['gmapping'] = gmapping
 
