@@ -113,6 +113,7 @@ class WaitForTeaching(smach.State):
                 rospy.loginfo('waiting for change_floor result...')
                 self.ac.wait_for_result()
                 # self.py_floor(command=2, floor=floor_name)
+            self.speak.say('はい')
             return 'end'
         if re.findall('案内', speech_raw):
             return 'request navigation'

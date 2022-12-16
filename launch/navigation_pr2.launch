@@ -12,6 +12,10 @@
 
   <include file="$(find virtual_force_drag)/launch/pr2_lead.launch" />
 
+  <include file="$(find teach_spot)/launch/human_filter_pr2.launch" />
+
+  <include file="$(find navigation_utils)/launch/tf_transposer.launch" />
+
   <group if="$(arg inside_pr2)" >
 
   <node name="spot_map_server"
