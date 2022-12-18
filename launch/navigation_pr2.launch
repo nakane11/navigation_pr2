@@ -18,61 +18,61 @@
 
   <group if="$(arg inside_pr2)" >
 
-  <node name="spot_map_server"
-  pkg="navigation_pr2_nx" type="spot_map_server.py"
-  output="screen"
-  clear_params="true" >
-  </node>
+    <node name="spot_map_server"
+          pkg="navigation_pr2_nx" type="spot_map_server.py"
+          output="screen"
+          clear_params="true" >
+    </node>
 
-  <node name="republish_marker_array"
-  pkg="navigation_pr2_3rdparty" type="republish_marker_array.py"
-  output="screen" respawn="true"
-  clear_params="true" >
-  <remap from="~input" to="/spot_map_server/nodes" />
-  <remap from="~output" to="/spot_map_server/nodes_republish" />
-  </node>
+    <node name="republish_marker_array"
+          pkg="navigation_pr2_3rdparty" type="republish_marker_array.py"
+          output="screen" respawn="true"
+          clear_params="true" >
+      <remap from="~input" to="/spot_map_server/nodes" />
+      <remap from="~output" to="/spot_map_server/nodes_republish" />
+    </node>
 
   </group>
 
   <group unless="$(arg inside_pr2)" >
 
-  <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
-  <arg name="gui" value="false" />
-  <arg name="gpu" value="-1" />
-  <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
-  <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
-  <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
-  <arg name="with_depth" value="true" />
-  </include>
+    <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
+      <arg name="gui" value="false" />
+      <arg name="gpu" value="-1" />
+      <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
+      <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
+      <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
+      <arg name="with_depth" value="true" />
+    </include>
 
-  <node name="spot_map_server"
-  pkg="navigation_pr2" type="spot_map_server.py"
-  output="screen"
-  clear_params="true" >
-  </node>
+    <node name="spot_map_server"
+          pkg="navigation_pr2" type="spot_map_server.py"
+          output="screen"
+          clear_params="true" >
+    </node>
 
-  <node name="republish_marker_array"
-  pkg="navigation_pr2" type="republish_marker_array.py"
-  output="screen"
-  clear_params="true" >
-  <remap from="~input" to="/spot_map_server/nodes" />
-  <remap from="~output" to="/spot_map_server/nodes_republish" />
-  </node>
+    <node name="republish_marker_array"
+          pkg="navigation_pr2" type="republish_marker_array.py"
+          output="screen"
+          clear_params="true" >
+      <remap from="~input" to="/spot_map_server/nodes" />
+      <remap from="~output" to="/spot_map_server/nodes_republish" />
+    </node>
 
   </group>
 
   <node name="speak_node"
-  pkg="navigation_pr2" type="speak.py"
-  respawn="true" >
+        pkg="navigation_pr2" type="speak.py"
+        respawn="true" >
     <rosparam subst_value="true">
       volume: $(arg speaker_volume)
     </rosparam>
   </node>
 
   <node name="map_manager"
-  pkg="navigation_pr2" type="map_manager.py"
-  output="screen"
-  clear_params="true" >
+        pkg="navigation_pr2" type="map_manager.py"
+        output="screen"
+        clear_params="true" >
   </node>
 
   <node pkg="roseus" type="roseus" name="move_wrist" respawn="true"

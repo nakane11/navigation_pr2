@@ -1,0 +1,56 @@
+<launch>
+  <arg name="launch_sound_play" default="false" doc="Launch sound_play node to speak" />
+  <arg name="audio_topic" default="/input_audio" doc="Name of audio topic captured from microphone" />
+  <arg name="voice_topic" default="/Tablet/voice/whisper" doc="Name of text topic of recognized speech" />
+  <arg name="n_channel" default="1" doc="Number of channels of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="depth" default="16" doc="Bit depth of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="sample_rate" default="16000" doc="Frame rate of audio topic and microphone. '$ pactl list short sinks' to check your hardware"/>
+  <arg name="device" default="" doc="Card and device number of microphone (e.g. hw:0,0). you can check card number and device number by '$ arecord -l', then uses hw:[card number],[device number]" />
+  <arg name="engine" default="Whisper" doc="Speech to text engine. TTS engine, Google, GoogleCloud, Sphinx, Wit, Bing Houndify, IBM" />
+  <arg name="language" default="ja-JP" doc="Speech to text language. For Japanese, set ja-JP." />
+  <arg name="continuous" default="true" doc="If false, /speech_recognition service is published. If true, /Tablet/voice topic is published." />
+
+  <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
+  <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
+  <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
+  
+  <node name="speech_recognition_whisper"
+        pkg="ros_speech_recognition" type="speech_recognition_node.py"
+        respawn="true" >
+    <rosparam subst_value="true">
+      audio_topic: $(arg audio_topic)
+      voice_topic: $(arg voice_topic)
+      n_channel: $(arg n_channel)
+      depth: $(arg depth)
+      sample_rate: $(arg sample_rate)
+      engine: $(arg engine)
+      continuous: $(arg continuous)
+      enable_sound_effect: $(arg launch_sound_play)
+      whisper_lang: japanese
+      whisper_model: base
+    </rosparam>
+  </node>
+
+  <node name="filtered_relay"
+        pkg="jsk_topic_tools" type="filtered_relay.py"
+        output="screen"
+        clear_params="true" >
+    <remap from="~input" to="/$(arg voice_topic)" />
+    <remap from="~output" to="/Tablet/voice/whisper_filtered" />
+    <rosparam>
+      output_type: speech_recognition_msgs/SpeechRecognitionCandidates
+      import: [speech_recognition_msgs]
+      filter: "m.transcript[0]"
+    </rosparam>
+  </node>
+
+  <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
+    <arg name="gui" value="false" />
+    <arg name="gpu" value="-1" />
+    <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
+    <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
+    <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
+    <arg name="with_depth" value="true" />
+  </include>
+  
+</launch>
