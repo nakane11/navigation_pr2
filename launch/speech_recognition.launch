@@ -125,11 +125,17 @@
     </node>
   </group>
 
+  <node name="input_sr_mux" pkg="topic_tools" type="mux"
+        respawn="true"
+	args="/Tablet/voice/mux /Tablet/voice /Tablet/voice/whisper_filtered">
+    <remap from="mux" to="input_sr_mux" />
+  </node>
+
   <node pkg="jsk_robot_startup" type="mux_selector.py" name="sr_selector"
         respawn="true" output="screen"
         args="/Tablet/voice 'True' /Tablet/voice /Tablet/voice/whisper_filtered 'True' /Tablet/voice/whisper_filtered">
-    <remap from="mux" to="/Tablet/voice/mux" />
-    <param name="default_select" value="/teleop/cmd_vel"/>
+    <remap from="mux" to="input_sr_mux" />
+    <param name="default_select" value="/Tablet/voice"/>
     <rosparam subst_value="true">
       topics:
         - name: /Tablet/voice

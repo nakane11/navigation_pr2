@@ -33,7 +33,7 @@
 
   <node name="filtered_relay"
         pkg="jsk_topic_tools" type="filtered_relay.py"
-        output="screen"
+        output="screen" respawn="true"
         clear_params="true" >
     <remap from="~input" to="/$(arg voice_topic)" />
     <remap from="~output" to="/Tablet/voice/whisper_filtered" />
