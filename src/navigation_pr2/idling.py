@@ -37,7 +37,7 @@ class Initialize(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=20.0)
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=40.0)
 
     def execute(self, userdata):
         self.dr.update_configuration({"acc_lim_x" : 2.0})
@@ -75,7 +75,7 @@ class Shutdown(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=20.0)
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=40.0)
 
     def execute(self, userdata):
         self.dr.update_configuration({"acc_lim_x" : 2.5})

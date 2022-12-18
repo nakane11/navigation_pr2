@@ -83,7 +83,7 @@
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen" respawn="true"
         clear_params="true" >
-    <remap from="~input1" to="/Tablet/voice" />
+    <remap from="~input1" to="/Tablet/voice/mux" />
     <!-- <remap from="~input2" to="/robotsound_jp/goal" />  -->
     <remap from="~input2" to="/speak_node/say/goal" />
     <rosparam>

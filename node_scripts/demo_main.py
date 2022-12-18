@@ -15,7 +15,7 @@ from speech_recognition_msgs.msg import SpeechRecognitionCandidates
 class NavigationSmach():
     def __init__(self):
         rospy.init_node('navigation_state_machine')
-        self.speech_sub = rospy.Subscriber('/Tablet/voice', SpeechRecognitionCandidates, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice/mux', SpeechRecognitionCandidates, self.speech_cb)
         self.speak = SpeakClient()
 
     def speech_cb(self, msg):
