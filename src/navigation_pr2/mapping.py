@@ -146,7 +146,8 @@ class FinishMapping(smach.State):
 
 class SendWithName(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['send spot with name'], input_keys=['new_spot_name'])
+        smach.State.__init__(self, outcomes=['send spot with name', 'register elevator'],
+                             input_keys=['new_spot_name'])
         self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
         rospy.loginfo('waiting for spot_map_server/add...')
         self.ac.wait_for_server()
@@ -155,14 +156,14 @@ class SendWithName(smach.State):
     def execute(self, userdata):
         name = userdata.new_spot_name
         rospy.loginfo("add new spot: {}".format(name))
-        # if re.search(r'エレベータ(.*)$', name) is not None:
-        #     goal = RecordSpotGoal()
-        #     goal.command = 3
-        #     goal.name = name
-        #     goal.node.type = 1
-        #     goal.update_keys = ['type']
-        #     self.ac.send_goal(goal)
-        #     return 'register elevator'
+        if re.search(r'.*エ.*ベータ.*$', name) is not None:
+            goal = RecordSpotGoal()
+            goal.command = 3
+            goal.name = name
+            goal.node.type = 1
+            goal.update_keys = ['type']
+            self.ac.send_goal(goal)
+            return 'register elevator'
 
         goal = RecordSpotGoal()
         goal.command = 1
@@ -248,6 +249,8 @@ def con_mapping_child_term_cb(outcome_map):
         return True
     if outcome_map['RECORD_WITH_NAME'] == 'request navigation':
         return True
+    if outcome_map['RECORD_WITH_NAME'] == 'elevator':
+        return True
     return False
 
 def con_mapping_out_cb(outcome_map):
@@ -255,3 +258,5 @@ def con_mapping_out_cb(outcome_map):
         return 'succeeded'
     if outcome_map['RECORD_WITH_NAME'] == 'request navigation':
         return 'start navigation'
+    if outcome_map['RECORD_WITH_NAME'] == 'elevator':
+        return 'elevator'

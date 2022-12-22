@@ -6,6 +6,8 @@ from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
 from navigation_pr2.idling import *
 from navigation_pr2.hand_impact import *
+from navigation_pr2.move_base import ROSRobotMoveBaseInterface
+from navigation_pr2.elevator import *
 
 import rospy
 import smach
@@ -17,6 +19,7 @@ class NavigationSmach():
         rospy.init_node('navigation_state_machine')
         self.speech_sub = rospy.Subscriber('/Tablet/voice/mux', SpeechRecognitionCandidates, self.speech_cb)
         self.speak = SpeakClient()
+        self.ri = ROSRobotMoveBaseInterface()
 
     def speech_cb(self, msg):
         rospy.set_param('~speech_raw', msg.transcript[0])
@@ -26,13 +29,13 @@ class NavigationSmach():
         ############  MAPPING  ############
         ###################################
         print(0)
-        con_mapping = smach.Concurrence(outcomes=['outcome', 'succeeded', 'start navigation'],
+        con_mapping = smach.Concurrence(outcomes=['outcome', 'succeeded', 'start navigation', 'elevator'],
                                         default_outcome='outcome', 
                                         child_termination_cb = con_mapping_child_term_cb,
                                         outcome_cb=con_mapping_out_cb)
 
         with con_mapping:
-            sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation'])
+            sm_record_with_name = smach.StateMachine(outcomes=['succeeded', 'request navigation', 'elevator'])
             with sm_record_with_name:
                 smach.StateMachine.add('WAIT_FOR_TEACHING', WaitForTeaching(client=self.speak),
                                        transitions={'timeout':'EXPLAIN',
@@ -43,7 +46,8 @@ class NavigationSmach():
                                                     'aborted':'WAIT_FOR_TEACHING',
                                                     'cancelled':'SEND_CANCEL_NAME'})
                 smach.StateMachine.add('SEND_WITH_NAME', SendWithName(client=self.speak),
-                                       transitions={'send spot with name':'WAIT_FOR_TEACHING'})
+                                       transitions={'send spot with name':'WAIT_FOR_TEACHING',
+                                                    'register elevator':'elevator'})
                 smach.StateMachine.add('SEND_DESCRIPTION', SendDescription(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SEND_CANCEL_NAME', SendCancelName(),
@@ -53,6 +57,20 @@ class NavigationSmach():
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
 
+        sm_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'])
+        with sm_elevator:
+            smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak),
+                                   transitions={'succeeded':'MOVE_TO_INSIDE',
+                                                'aborted':'TEACH_RIDING_POSITION'})
+            smach.StateMachine.add('MOVE_TO_INSIDE', MovetoInside(client=self.speak, ri=self.ri),
+                                   transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR',
+                                                'aborted':'MOVE_TO_INSIDE'})
+            smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR', WaitforNextFloor(client=self.speak),
+                                   transitions={'succeeded':'',
+                                                'aborted':'WAIT_FOR_NEXT_FLOOR'})
+            smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(ri=self.ri),
+                                   transitions={'succeeded':'succeeded',
+                                                'aborted':'aborted'})
 
         ###################################
         ###########  NAVIGATION  ##########
@@ -171,7 +189,11 @@ class NavigationSmach():
             smach.StateMachine.add('MAPPING', con_mapping,
                                    transitions={'outcome':'MAPPING',
                                                 'succeeded':'FINISH_MAPPING',
-                                                'start navigation':'NAVIGATION'})
+                                                'start navigation':'NAVIGATION',
+                                                'elevator':'ELEVATOR'})
+            smach.StateMachine.add('ELEVATOR', sm_elevator,
+                                   transitions={'succeeded':'MAPPING',
+                                                'aborted':'FINISH_MAPPING'})
             smach.StateMachine.add('FINISH_MAPPING', FinishMapping(),
                                    transitions={'succeeded':'IDLING'})
             smach.StateMachine.add('SHUTDOWN', Shutdown(),
