@@ -49,6 +49,131 @@ def compute_difference_between_poses(p1, p2):
                      p1.position.y - p2.position.y])
     return np.linalg.norm(diff)
 
+def _wrap_axis(axis):
+    """Convert axis to float vector.
+    Parameters
+    ----------
+    axis : list or numpy.ndarray or str or bool or None
+        rotation axis indicated by number or string.
+    Returns
+    -------
+    axis : numpy.ndarray
+        conveted axis
+    Examples
+    --------
+    >>> from skrobot.coordinates.math import _wrap_axis
+    >>> _wrap_axis('x')
+    array([1, 0, 0])
+    >>> _wrap_axis('y')
+    array([0, 1, 0])
+    >>> _wrap_axis('z')
+    array([0, 0, 1])
+    >>> _wrap_axis('xy')
+    array([1, 1, 0])
+    >>> _wrap_axis([1, 1, 1])
+    array([1, 1, 1])
+    >>> _wrap_axis(True)
+    array([0, 0, 0])
+    >>> _wrap_axis(False)
+    array([1, 1, 1])
+    """
+    if isinstance(axis, str):
+        if axis in ['x', 'xx']:
+            axis = np.array([1, 0, 0])
+        elif axis in ['y', 'yy']:
+            axis = np.array([0, 1, 0])
+        elif axis in ['z', 'zz']:
+            axis = np.array([0, 0, 1])
+        elif axis == '-x':
+            axis = np.array([-1, 0, 0])
+        elif axis == '-y':
+            axis = np.array([0, -1, 0])
+        elif axis == '-z':
+            axis = np.array([0, 0, -1])
+        elif axis in ['xy', 'yx']:
+            axis = np.array([1, 1, 0])
+        elif axis in ['yz', 'zy']:
+            axis = np.array([0, 1, 1])
+        elif axis in ['zx', 'xz']:
+            axis = np.array([1, 0, 1])
+        else:
+            raise NotImplementedError
+    elif isinstance(axis, list):
+        if not len(axis) == 3:
+            raise ValueError
+        axis = np.array(axis)
+    elif isinstance(axis, np.ndarray):
+        if not axis.shape == (3,):
+            raise ValueError
+    elif isinstance(axis, bool):
+        if axis is True:
+            return np.array([0, 0, 0])
+        else:
+            return np.array([1, 1, 1])
+    elif axis is None:
+        return np.array([1, 1, 1])
+    else:
+        raise ValueError
+    return axis
+
+def inverse_transform_vector(self, vec):
+        """Transform vector in world coordinates to local coordinates
+        Parameters
+        ----------
+        vec : numpy.ndarray
+            3d vector.
+            We can take batch of vector like (batch_size, 3)
+        Returns
+        -------
+        transformed_point : numpy.ndarray
+            transformed point
+        """
+        vec = np.array(vec, dtype=np.float64)
+        if vec.ndim == 2:
+            return (np.matmul(self.rotation.T, vec.T)
+                    - np.matmul(
+                        self.rotation.T, self.translation).reshape(3, -1)).T
+        return np.matmul(self.rotation.T, vec) - \
+            np.matmul(self.rotation.T, self.translation)
+
+def difference_position(coords,
+                        translation_axis=True):
+    """Return differences in positoin of given coords.
+    Parameters
+    ----------
+    coords : skrobot.coordinates.Coordinates
+        given coordinates
+    translation_axis : str or bool or None (optional)
+        we can take 'x', 'y', 'z', 'xy', 'yz', 'zx', 'xx', 'yy', 'zz',
+        True or False(None).
+    Returns
+    -------
+    dif_pos : numpy.ndarray
+        difference position of self coordinates and coords
+        considering translation_axis.
+    Examples
+    --------
+    >>> from skrobot.coordinates import Coordinates
+    >>> from skrobot.coordinates import transform_coords
+    >>> from numpy import pi
+    >>> c1 = Coordinates().translate([0.1, 0.2, 0.3]).rotate(
+    ...          pi / 3.0, 'x')
+    >>> c2 = Coordinates().translate([0.3, -0.3, 0.1]).rotate(
+    ...          pi / 2.0, 'y')
+    >>> c1.difference_position(c2)
+    array([ 0.2       , -0.42320508,  0.3330127 ])
+    >>> c1 = Coordinates().translate([0.1, 0.2, 0.3]).rotate(0, 'x')
+    >>> c2 = Coordinates().translate([0.3, -0.3, 0.1]).rotate(
+    ...          pi / 3.0, 'x')
+    >>> c1.difference_position(c2)
+    array([ 0.2, -0.5, -0.2])
+    """
+    dif_pos = self.inverse_transform_vector(coords.worldpos())
+    translation_axis = _wrap_axis(translation_axis)
+    dif_pos[translation_axis == 1] = 0.0
+    return dif_pos
+
+
 def make_cylinder(radius=0.1,
                   height=1.0,
                   pos=[0.0, 0.0, 0.0],
