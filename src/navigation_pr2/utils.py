@@ -12,13 +12,29 @@ from tf.transformations import unit_vector as normalize_vector
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker
 from jsk_recognition_utils.color import labelcolormap
-from geometry_msgs.msg import Point, PoseArray
+from geometry_msgs.msg import Point, Pose, PoseArray
 
 N = 256
 colors = labelcolormap(N=N) / 255.0
 
 floors = {'一':'1', '二':'2', '三':'3', '四':'4', '五':'5', '六':'6', '七':'7', '八':'8', '九':'9', \
           '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9'}
+
+def get_robotpose(listener):
+    try:
+        (trans,rot) = listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
+    except Exception as e:
+        rospy.logerr(e)
+        return False
+    pose = Pose()
+    pose.position.x = trans[0]
+    pose.position.y = trans[1]
+    pose.position.z = trans[2]
+    pose.orientation.x = rot[0]
+    pose.orientation.y = rot[1]
+    pose.orientation.z = rot[2]
+    pose.orientation.w = rot[3]
+    return pose
 
 def wait_for_speech(timeout=0):
     start_time = rospy.Time.now()

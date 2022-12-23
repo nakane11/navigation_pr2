@@ -6,9 +6,10 @@ from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
 from navigation_pr2.idling import *
 from navigation_pr2.hand_impact import *
-from navigation_pr2.move_base import ROSRobotMoveBaseInterface
+import skrobot
+from skrobot.interfaces.ros import PR2ROSRobotInterface
 from navigation_pr2.elevator import *
-
+import tf
 import rospy
 import smach
 import smach_ros
@@ -19,7 +20,9 @@ class NavigationSmach():
         rospy.init_node('navigation_state_machine')
         self.speech_sub = rospy.Subscriber('/Tablet/voice/mux', SpeechRecognitionCandidates, self.speech_cb)
         self.speak = SpeakClient()
-        self.ri = ROSRobotMoveBaseInterface()
+        self.listener = tf.TransformListener()
+        r = skrobot.models.PR2()
+        self.ri = PR2ROSRobotInterface(r)
 
     def speech_cb(self, msg):
         rospy.set_param('~speech_raw', msg.transcript[0])
@@ -60,16 +63,16 @@ class NavigationSmach():
         sm_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
                                          input_keys=['riding_position', 'adjust_riding'])
         with sm_elevator:
-            smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak),
+            smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener),
                                    transitions={'succeeded':'MOVE_TO_INSIDE',
                                                 'aborted':'TEACH_RIDING_POSITION'})
             smach.StateMachine.add('MOVE_TO_INSIDE', MovetoInside(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR',
                                                 'aborted':'MOVE_TO_INSIDE'})
             smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR', WaitforNextFloor(client=self.speak),
-                                   transitions={'succeeded':'',
+                                   transitions={'succeeded':'MOVE_TO_EXIT',
                                                 'aborted':'WAIT_FOR_NEXT_FLOOR'})
-            smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(ri=self.ri),
+            smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'succeeded',
                                                 'aborted':'aborted'})
 

@@ -5,19 +5,19 @@ import actionlib
 import smach
 import re
 import rospy
-import tf
 from navigation_pr2.utils import *
 from virtual_force_drag.msg import SwitchAction, SwitchGoal
+from navigation_pr2.srv import ChangeFloor
+from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
 from geometry_msgs.msg import Twist
-from geometry_msgs.msg import Pose
 
 class TeachRidingPosition(smach.State):
-    def __init__(self, client):
+    def __init__(self, client, listener):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
                              input_keys=['riding_position'],
                              output_keys=['riding_position'])
         self.speak = client
-        self.listener = tf.TransformListener()
+        self.listener = listener
 
     def execute(self, userdata):
         self.speak.say('私をエレベータにのせてください')
@@ -26,7 +26,7 @@ class TeachRidingPosition(smach.State):
             speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
             rospy.delete_param('~speech_raw')
             if re.search(r'腕.*$', speech_raw) is not None:
-                pos = self.get_robotpose()
+                pos = get_robotpose(self.listener)
                 tmp = userdata.riding_position
                 floor_name = rospy.get_param('~floor')
                 tmp[floor_name] = pos
@@ -35,22 +35,6 @@ class TeachRidingPosition(smach.State):
                 return 'succeeded'
         self.speak.parrot(speech_raw)
         return 'aborted'
-
-    def get_robotpose(self):
-        try:
-            (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
-        except Exception as e:
-            rospy.logerr(e)
-            return False
-        pose = Pose()
-        pose.position.x = trans[0]
-        pose.position.y = trans[1]
-        pose.position.z = trans[2]
-        pose.orientation.x = rot[0]
-        pose.orientation.y = rot[1]
-        pose.orientation.z = rot[2]
-        pose.orientation.w = rot[3]
-        return pose
 
 class MovetoInside(smach.State):
     def __init__(self, client, ri):
@@ -72,7 +56,7 @@ class MovetoInside(smach.State):
             self.ac.send_goal(goal)
             self.ac.wait_for_result()
             self.speak.say('乗り込み位置を教えて下さい')
-            self.start_odom = self.ri.odom()
+            self.start_odom = self.ri.odom
             self.start = True
 
         rospy.loginfo('waiting ...')
@@ -81,7 +65,8 @@ class MovetoInside(smach.State):
             rospy.delete_param('~speech_raw')
             pub_msg = Twist()
             if re.search(r'ここ.*$', speech_raw) is not None:
-                diff = self.start_odom.difference_position(self.ri.odom())
+                diff = self.ri.odom.difference_position(self.start_odom)
+                print('diff:{}'.format(diff))
                 floor_name = rospy.get_param('~floor')
                 tmp = userdata.adjust_riding
                 tmp[floor_name] = diff
@@ -90,27 +75,27 @@ class MovetoInside(smach.State):
                 self.start = False
                 return 'succeeded'
             elif re.search(r'.*左.*$', speech_raw) is not None:
-                pub_msg.linear.y = 0.6
+                pub_msg.linear.y = 0.3
                 self.speak.say('左')
-                for i in range(3):
+                for i in range(6):
                     self.pub.publish(pub_msg)
                     rospy.sleep(0.1)
             elif re.search(r'.*右.*$', speech_raw) is not None:
-                pub_msg.linear.y = -0.6
+                pub_msg.linear.y = -0.3
                 self.speak.say('右')
-                for i in range(3):
+                for i in range(6):
                     self.pub.publish(pub_msg)
                     rospy.sleep(0.1)
             elif re.search(r'.*前.*$', speech_raw) is not None:
-                pub_msg.linear.x = 0.6
+                pub_msg.linear.x = 0.3
                 self.speak.say('前')
-                for i in range(3):
+                for i in range(6):
                     self.pub.publish(pub_msg)
                     rospy.sleep(0.1)
             elif re.search(r'.*後.*$', speech_raw) is not None:
-                pub_msg.linear.x = -0.6
+                pub_msg.linear.x = -0.3
                 self.speak.say('後ろ')
-                for i in range(3):
+                for i in range(6):
                     self.pub.publish(pub_msg)
                     rospy.sleep(0.1)
             else:
@@ -121,10 +106,23 @@ class MovetoInside(smach.State):
         
 class WaitforNextFloor(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+                             input_keys=['adjust_riding'],
+                             output_keys=['adjust_riding'])
+        self.multiple_floor = rospy.get_param('~multiple_floor')
         self.speak = client
+        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        rospy.loginfo('waiting for spot_map_server/change_floor...')
+        rospy.wait_for_service('spot_map_server/change_floor')
+        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        if self.multiple_floor:
+            self.ac = actionlib.SimpleActionClient('map_manager/change_floor', ChangeFloorAction)
+            rospy.loginfo('waiting for map_manager/change_floor...')
+            self.ac.wait_for_server()
         
     def execute(self, userdata):
+        current_floor_name = rospy.get_param('~floor')
+        tmp = userdata.adjust_riding
         # 到着をまつ
         rospy.loginfo('waiting ...')
         if wait_for_speech(timeout=300):
@@ -134,6 +132,8 @@ class WaitforNextFloor(smach.State):
                 self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
                 self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
                 floor_name = floors[self.floor_name]
+                tmp[floor_name] = userdata.adjust_riding[current_floor_name]
+                userdata.adjust_riding = tmp
                 self.eus_floor(floor=floor_name)
                 if self.multiple_floor:
                     goal = ChangeFloorGoal()
@@ -150,13 +150,14 @@ class WaitforNextFloor(smach.State):
         return 'aborted'
 
 class MovetoExit(smach.State):
-    def __init__(self, ri):
+    def __init__(self, client, ri):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
                              input_keys=['adjust_riding'])
         self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
         rospy.loginfo('waiting for lead_pr2_action...')
         self.ac.wait_for_server()
         self.ri = ri
+        self.speak = client
 
     def execute(self, userdata):
         # 降車位置に移動
@@ -166,6 +167,7 @@ class MovetoExit(smach.State):
         # 腕を出す
         goal = SwitchGoal(switch=True)
         self.ac.send_goal(goal)
+        self.speak.say('エレベータからおろして下さい')
         return 'succeeded'
 
 class MoveInsideElevator(smach.State):
