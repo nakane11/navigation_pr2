@@ -163,6 +163,20 @@ class SendWithName(smach.State):
             goal.node.type = 1
             goal.update_keys = ['type']
             self.ac.send_goal(goal)
+            self.ac.wait_for_result()
+            result = self.ac.get_result().result
+            flag = True
+            while result is False:
+                if flag:
+                    self.speak.say('位置を確認するので待って下さい')
+                    flag = False
+                self.ac.send_goal(goal)
+                self.ac.wait_for_result()
+                print(self.ac.get_result())
+                result = self.ac.get_result().result
+                rospy.loginfo('wait for transform')
+                if result:
+                    self.speak.say('記録しました')
             return 'register elevator'
 
         goal = RecordSpotGoal()

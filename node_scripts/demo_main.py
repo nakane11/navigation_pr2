@@ -73,8 +73,11 @@ class NavigationSmach():
                                    transitions={'succeeded':'MOVE_TO_EXIT',
                                                 'aborted':'WAIT_FOR_NEXT_FLOOR'})
             smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
-                                   transitions={'succeeded':'succeeded',
+                                   transitions={'succeeded':'TEACH_OUTSIDE_ELEVATOR',
                                                 'aborted':'aborted'})
+            smach.StateMachine.add('TEACH_OUTSIDE_ELEVATOR', TeachOutsideElevator(client=self.speak),
+                                   transitions={'succeeded':'succeeded',
+                                                'aborted':'TEACH_OUTSIDE_ELEVATOR'})
 
         ###################################
         ###########  NAVIGATION  ##########

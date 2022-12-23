@@ -79,6 +79,7 @@ class SpotMapServer(object):
 
     def stop_auto_map(self, req):
         self.auto_map_enabled = False
+        self.current_node = None
         rospy.loginfo('auto map disabled')        
         return EmptyResponse()
 
@@ -297,6 +298,7 @@ class SpotMapServer(object):
                     mapping = {self.current_node: node_name}
                     self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
                     self.active_graph.nodes[node_name]['name'] = True
+                    print(list(self.active_graph.nodes))
                     rospy.loginfo('Replace {} to {}'.format(self.current_node, node_name))
                     self.current_node = node_name
                     return

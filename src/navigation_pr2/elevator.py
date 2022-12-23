@@ -170,14 +170,41 @@ class MovetoExit(smach.State):
         self.speak.say('エレベータからおろして下さい')
         return 'succeeded'
 
-class MoveInsideElevator(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],        
-                             input_keys=[])
+class TeachOutsideElevator(smach.State):
+    def __init__(self, client):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        self.speak = client
 
     def execute(self, userdata):
-        # エレベータの中に移動
-        return
+        floor_name = rospy.get_param('~floor')
+        # 次の階のエレベータの位置を教える
+        if wait_for_speech(timeout=300):
+            speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
+            rospy.delete_param('~speech_raw')
+            if re.search(r'^.*エレベータ.*$', speech_raw) is not None:
+                goal = RecordSpotGoal()
+                goal.command = 3
+                goal.name = name
+                goal.node.type = 1
+                goal.update_keys = ['type']
+                self.ac.send_goal(goal)
+                self.ac.wait_for_result()
+                result = self.ac.get_result().result
+                flag = True
+                while result is False:
+                    if flag:
+                        self.speak.say('位置を確認するので待って下さい')
+                        flag = False
+                        self.ac.send_goal(goal)
+                        self.ac.wait_for_result()
+                        print(self.ac.get_result())
+                        result = self.ac.get_result().result
+                        rospy.loginfo('wait for transform')
+                self.speak.say('はい。記録しました')
+                return 'succeeded'
+            self.speak.parrot(speech_raw)
+        self.speak.say('{}階のエレベータの位置を教えて下さい'.format(floor_name))
+        return 'aborted'
 
 class HoldDoor(smach.State):
     def __init__(self):
