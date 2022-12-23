@@ -17,6 +17,7 @@ class TeachRidingPosition(smach.State):
                              input_keys=['riding_position'],
                              output_keys=['riding_position'])
         self.speak = client
+        self.listener = tf.TransformListener()
 
     def execute(self, userdata):
         self.speak.say('私をエレベータにのせてください')
@@ -25,7 +26,7 @@ class TeachRidingPosition(smach.State):
             speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
             rospy.delete_param('~speech_raw')
             if re.search(r'腕.*$', speech_raw) is not None:
-                pos = get_robotpose()
+                pos = self.get_robotpose()
                 tmp = userdata.riding_position
                 floor_name = rospy.get_param('~floor')
                 tmp[floor_name] = pos
@@ -34,6 +35,22 @@ class TeachRidingPosition(smach.State):
                 return 'succeeded'
         self.speak.parrot(speech_raw)
         return 'aborted'
+
+    def get_robotpose(self):
+        try:
+            (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
+        except Exception as e:
+            rospy.logerr(e)
+            return False
+        pose = Pose()
+        pose.position.x = trans[0]
+        pose.position.y = trans[1]
+        pose.position.z = trans[2]
+        pose.orientation.x = rot[0]
+        pose.orientation.y = rot[1]
+        pose.orientation.z = rot[2]
+        pose.orientation.w = rot[3]
+        return pose
 
 class MovetoInside(smach.State):
     def __init__(self, client, ri):
@@ -62,6 +79,7 @@ class MovetoInside(smach.State):
         if wait_for_speech(timeout=120):
             speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
             rospy.delete_param('~speech_raw')
+            pub_msg = Twist()
             if re.search(r'ここ.*$', speech_raw) is not None:
                 diff = self.start_odom.difference_position(self.ri.odom())
                 floor_name = rospy.get_param('~floor')
@@ -72,21 +90,29 @@ class MovetoInside(smach.State):
                 self.start = False
                 return 'succeeded'
             elif re.search(r'.*左.*$', speech_raw) is not None:
-                pub_msg = Twist(y=0.2)
-                self.speak.say('はい')
-                self.pub.publish(pub_msg)
+                pub_msg.linear.y = 0.6
+                self.speak.say('左')
+                for i in range(3):
+                    self.pub.publish(pub_msg)
+                    rospy.sleep(0.1)
             elif re.search(r'.*右.*$', speech_raw) is not None:
-                pub_msg = Twist(y=-0.2)
-                self.speak.say('はい')
-                self.pub.publish(pub_msg)
+                pub_msg.linear.y = -0.6
+                self.speak.say('右')
+                for i in range(3):
+                    self.pub.publish(pub_msg)
+                    rospy.sleep(0.1)
             elif re.search(r'.*前.*$', speech_raw) is not None:
-                pub_msg = Twist(x=0.2)
-                self.speak.say('はい')
-                self.pub.publish(pub_msg)
+                pub_msg.linear.x = 0.6
+                self.speak.say('前')
+                for i in range(3):
+                    self.pub.publish(pub_msg)
+                    rospy.sleep(0.1)
             elif re.search(r'.*後.*$', speech_raw) is not None:
-                pub_msg = Twist(x=-0.2)
-                self.speak.say('はい')
-                self.pub.publish(pub_msg)
+                pub_msg.linear.x = -0.6
+                self.speak.say('後ろ')
+                for i in range(3):
+                    self.pub.publish(pub_msg)
+                    rospy.sleep(0.1)
             else:
                 self.speak.parrot(speech_raw)
         else:

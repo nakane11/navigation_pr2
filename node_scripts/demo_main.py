@@ -57,7 +57,8 @@ class NavigationSmach():
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
 
-        sm_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'])
+        sm_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
+                                         input_keys=['riding_position', 'adjust_riding'])
         with sm_elevator:
             smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak),
                                    transitions={'succeeded':'MOVE_TO_INSIDE',

@@ -4,6 +4,188 @@ import actionlib
 import control_msgs.msg
 import nav_msgs.msg
 
+def _wrap_axis(axis):
+    """Convert axis to float vector.
+    Parameters
+    ----------
+    axis : list or numpy.ndarray or str or bool or None
+        rotation axis indicated by number or string.
+    Returns
+    -------
+    axis : numpy.ndarray
+        conveted axis
+    Examples
+    --------
+    >>> from skrobot.coordinates.math import _wrap_axis
+    >>> _wrap_axis('x')
+    array([1, 0, 0])
+    >>> _wrap_axis('y')
+    array([0, 1, 0])
+    >>> _wrap_axis('z')
+    array([0, 0, 1])
+    >>> _wrap_axis('xy')
+    array([1, 1, 0])
+    >>> _wrap_axis([1, 1, 1])
+    array([1, 1, 1])
+    >>> _wrap_axis(True)
+    array([0, 0, 0])
+    >>> _wrap_axis(False)
+    array([1, 1, 1])
+    """
+    if isinstance(axis, str):
+        if axis in ['x', 'xx']:
+            axis = np.array([1, 0, 0])
+        elif axis in ['y', 'yy']:
+            axis = np.array([0, 1, 0])
+        elif axis in ['z', 'zz']:
+            axis = np.array([0, 0, 1])
+        elif axis == '-x':
+            axis = np.array([-1, 0, 0])
+        elif axis == '-y':
+            axis = np.array([0, -1, 0])
+        elif axis == '-z':
+            axis = np.array([0, 0, -1])
+        elif axis in ['xy', 'yx']:
+            axis = np.array([1, 1, 0])
+        elif axis in ['yz', 'zy']:
+            axis = np.array([0, 1, 1])
+        elif axis in ['zx', 'xz']:
+            axis = np.array([1, 0, 1])
+        else:
+            raise NotImplementedError
+    elif isinstance(axis, list):
+        if not len(axis) == 3:
+            raise ValueError
+        axis = np.array(axis)
+    elif isinstance(axis, np.ndarray):
+        if not axis.shape == (3,):
+            raise ValueError
+    elif isinstance(axis, bool):
+        if axis is True:
+            return np.array([0, 0, 0])
+        else:
+            return np.array([1, 1, 1])
+    elif axis is None:
+        return np.array([1, 1, 1])
+    else:
+        raise ValueError
+    return axis
+
+def quaternion_norm(q):
+    """Return the norm of quaternion.
+    Parameters
+    ----------
+    q : list or numpy.ndarray
+        [w, x, y, z] order
+    Returns
+    -------
+    norm_q : float
+        quaternion norm of q
+    Examples
+    --------
+    >>> from skrobot.coordinates.math import quaternion_norm
+    >>> q = [1, 1, 1, 1]
+    >>> quaternion_norm(q)
+    2.0
+    >>> q = [0, 0.7071067811865476, 0, 0.7071067811865476]
+    >>> quaternion_norm(q)
+    1.0
+    """
+    q = np.array(q)
+    if q.ndim == 1:
+        norm_q = np.sqrt(np.dot(q.T, q))
+    elif q.ndim == 2:
+        norm_q = np.sqrt(np.sum(q * q, axis=1, keepdims=True))
+    else:
+        raise ValueError
+    return norm_q
+
+def quaternion_normalize(q):
+    """Return the normalized quaternion.
+    Parameters
+    ----------
+    q : list or numpy.ndarray
+        [w, x, y, z] order
+    Returns
+    -------
+    normalized_q : numpy.ndarray
+        normalized quaternion
+    Examples
+    --------
+    >>> from skrobot.coordinates.math import quaternion_normalize
+    >>> from skrobot.coordinates.math import quaternion_norm
+    >>> q = quaternion_normalize([1, 1, 1, 1])
+    >>> quaternion_norm(q)
+    1.0
+    """
+    q = np.array(q)
+    normalized_q = q / quaternion_norm(q)
+    return normalized_q
+
+def quaternion2matrix(q, normalize=False):
+    """Returns matrix of given quaternion.
+    Parameters
+    ----------
+    quaternion : list or numpy.ndarray
+        quaternion [w, x, y, z] order
+    normalize : bool
+        if normalize is True, input quaternion is normalized.
+    Returns
+    -------
+    rot : numpy.ndarray
+        3x3 rotation matrix
+    Examples
+    --------
+    >>> import numpy
+    >>> from skrobot.coordinates.math import quaternion2matrix
+    >>> quaternion2matrix([1, 0, 0, 0])
+    array([[1., 0., 0.],
+           [0., 1., 0.],
+           [0., 0., 1.]])
+    """
+    q = np.array(q)
+    if normalize:
+        q = quaternion_normalize(q)
+    else:
+        norm = quaternion_norm(q)
+        if not np.allclose(norm, 1.0):
+            raise ValueError("quaternion q's norm is not 1")
+    if q.ndim == 1:
+        q0 = q[0]
+        q1 = q[1]
+        q2 = q[2]
+        q3 = q[3]
+
+        m = np.zeros((3, 3))
+        m[0, 0] = q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3
+        m[0, 1] = 2 * (q1 * q2 - q0 * q3)
+        m[0, 2] = 2 * (q1 * q3 + q0 * q2)
+
+        m[1, 0] = 2 * (q1 * q2 + q0 * q3)
+        m[1, 1] = q0 * q0 - q1 * q1 + q2 * q2 - q3 * q3
+        m[1, 2] = 2 * (q2 * q3 - q0 * q1)
+
+        m[2, 0] = 2 * (q1 * q3 - q0 * q2)
+        m[2, 1] = 2 * (q2 * q3 + q0 * q1)
+        m[2, 2] = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3
+    elif q.ndim == 2:
+        m = np.zeros((q.shape[0], 3, 3), dtype=np.float64)
+        m[:, 0, 0] = q[:, 0] * q[:, 0] + \
+            q[:, 1] * q[:, 1] - q[:, 2] * q[:, 2] - q[:, 3] * q[:, 3]
+        m[:, 0, 1] = 2 * (q[:, 1] * q[:, 2] - q[:, 0] * q[:, 3])
+        m[:, 0, 2] = 2 * (q[:, 1] * q[:, 3] + q[:, 0] * q[:, 2])
+
+        m[:, 1, 0] = 2 * (q[:, 1] * q[:, 2] + q[:, 0] * q[:, 3])
+        m[:, 1, 1] = q[:, 0] * q[:, 0] - \
+            q[:, 1] * q[:, 1] + q[:, 2] * q[:, 2] - q[:, 3] * q[:, 3]
+        m[:, 1, 2] = 2 * (q[:, 2] * q[:, 3] - q[:, 0] * q[:, 1])
+
+        m[:, 2, 0] = 2 * (q[:, 1] * q[:, 3] - q[:, 0] * q[:, 2])
+        m[:, 2, 1] = 2 * (q[:, 2] * q[:, 3] + q[:, 0] * q[:, 1])
+        m[:, 2, 2] = q[:, 0] * q[:, 0] - \
+            q[:, 1] * q[:, 1] - q[:, 2] * q[:, 2] + q[:, 3] * q[:, 3]
+    return m
+
 def rpy_angle(matrix):
     """Decomposing a rotation matrix to yaw-pitch-roll.
     Parameters
@@ -105,6 +287,69 @@ class Coordinates(object):
         self.parent = None
         self._hook = hook
 
+    def inverse_transform_vector(self, vec):
+            """Transform vector in world coordinates to local coordinates
+            Parameters
+            ----------
+            vec : numpy.ndarray
+                3d vector.
+                We can take batch of vector like (batch_size, 3)
+            Returns
+            -------
+            transformed_point : numpy.ndarray
+                transformed point
+            """
+            q = np.array([q for q in self.rotation])
+            if np.abs(np.linalg.norm(q) - 1.0) > 1e-3:
+                raise ValueError('Invalid quaternion. Must be '
+                                 'norm 1.0, get {}'.
+                                 format(np.linalg.norm(q)))
+            rotation = quaternion2matrix(q)
+            vec = np.array(vec, dtype=np.float64)
+            if vec.ndim == 2:
+                return (np.matmul(rotation.T, vec.T)
+                        - np.matmul(
+                            rotation.T, self.translation).reshape(3, -1)).T
+            return np.matmul(rotation.T, vec) - \
+                np.matmul(rotation.T, self.translation)
+
+    def difference_position(self, coords,
+                            translation_axis=True):
+        """Return differences in positoin of given coords.
+        Parameters
+        ----------
+        coords : skrobot.coordinates.Coordinates
+            given coordinates
+        translation_axis : str or bool or None (optional)
+            we can take 'x', 'y', 'z', 'xy', 'yz', 'zx', 'xx', 'yy', 'zz',
+            True or False(None).
+        Returns
+        -------
+        dif_pos : numpy.ndarray
+            difference position of self coordinates and coords
+            considering translation_axis.
+        Examples
+        --------
+        >>> from skrobot.coordinates import Coordinates
+        >>> from skrobot.coordinates import transform_coords
+        >>> from numpy import pi
+        >>> c1 = Coordinates().translate([0.1, 0.2, 0.3]).rotate(
+        ...          pi / 3.0, 'x')
+        >>> c2 = Coordinates().translate([0.3, -0.3, 0.1]).rotate(
+        ...          pi / 2.0, 'y')
+        >>> c1.difference_position(c2)
+        array([ 0.2       , -0.42320508,  0.3330127 ])
+        >>> c1 = Coordinates().translate([0.1, 0.2, 0.3]).rotate(0, 'x')
+        >>> c2 = Coordinates().translate([0.3, -0.3, 0.1]).rotate(
+        ...          pi / 3.0, 'x')
+        >>> c1.difference_position(c2)
+        array([ 0.2, -0.5, -0.2])
+        """
+        dif_pos = self.inverse_transform_vector(coords.worldpos())
+        translation_axis = _wrap_axis(translation_axis)
+        dif_pos[translation_axis == 1] = 0.0
+        return dif_pos
+
     def rpy_angle(self):
         """Return a pair of rpy angles of this coordinates.
         Returns
@@ -121,6 +366,16 @@ class Coordinates(object):
         array([ 3.14159265, -2.0943951 , -1.57079633]))
         """
         return rpy_angle(self.rotation)
+
+    def worldpos(self):
+        """Return translation of this coordinate
+        See also skrobot.coordinates.Coordinates.translation
+        Returns
+        -------
+        self.translation : numpy.ndarray
+            translation of this coordinate
+        """
+        return self.translation
         
 class ROSRobotMoveBaseInterface(object):
     def __init__(self, *args, **kwargs):
