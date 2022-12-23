@@ -34,12 +34,12 @@
         ))
     ;; 右腕をたたむ
     (send *pr2* :rarm :angle-vector #f(-6.6127 60.5828 -122.994 -74.8254 56.2071 -5.72958 10.8427))
-    (send *ri* :rarm-angle-vector (send *pr2* :angle-vector) 500))
+    (send *ri* :rarm-angle-vector (send *pr2* :angle-vector) 3000))
   (send *ri* :wait-interpolation)
   (when (eq arm-side :both)
     ;; 左腕をたたむ
     (send *pr2* :larm :angle-vector #f(10.9964 63.8568 73.353 -113.496 5.90481 -92.0995 -23.1082))
-    (send *ri* :larm-angle-vector (send *pr2* :angle-vector) 500)
+    (send *ri* :larm-angle-vector (send *pr2* :angle-vector) 3000)
     (send *ri* :wait-interpolation)
     t
     )
