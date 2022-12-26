@@ -9,6 +9,7 @@ from navigation_pr2.utils import *
 from virtual_force_drag.msg import SwitchAction, SwitchGoal
 from navigation_pr2.srv import ChangeFloor
 from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
+from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from geometry_msgs.msg import Twist
 
 class TeachRidingPosition(smach.State):
@@ -174,6 +175,9 @@ class TeachOutsideElevator(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
         self.speak = client
+        self.ac = actionlib.SimpleActionClient('/spot_map_server/add', RecordSpotAction)
+        rospy.loginfo('waiting for spot_map_server/add...')
+        self.ac.wait_for_server()
 
     def execute(self, userdata):
         floor_name = rospy.get_param('~floor')
@@ -184,7 +188,7 @@ class TeachOutsideElevator(smach.State):
             if re.search(r'^.*エレベータ.*$', speech_raw) is not None:
                 goal = RecordSpotGoal()
                 goal.command = 3
-                goal.name = name
+                goal.name = 'エレベータ'
                 goal.node.type = 1
                 goal.update_keys = ['type']
                 self.ac.send_goal(goal)
