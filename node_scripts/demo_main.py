@@ -13,19 +13,22 @@ import tf
 import rospy
 import smach
 import smach_ros
-from speech_recognition_msgs.msg import SpeechRecognitionCandidates
+from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 
 class NavigationSmach():
     def __init__(self):
         rospy.init_node('navigation_state_machine')
-        self.speech_sub = rospy.Subscriber('/Tablet/voice/mux', SpeechRecognitionCandidates, self.speech_cb)
+        self.last_speech_time = rospy.Time.now()
+        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         r = skrobot.models.PR2()
         self.ri = PR2ROSRobotInterface(r)
 
     def speech_cb(self, msg):
-        rospy.set_param('~speech_raw', msg.transcript[0])
+        if msg.header.stamp - self.last_speech_time > rospy.Duration(0):
+            rospy.set_param('~speech_raw', msg.transcript[0])
+            self.last_speech_time = msg.header.stamp
 
     def smach(self):
         ###################################
@@ -66,7 +69,7 @@ class NavigationSmach():
             smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener),
                                    transitions={'succeeded':'MOVE_TO_INSIDE',
                                                 'aborted':'TEACH_RIDING_POSITION'})
-            smach.StateMachine.add('MOVE_TO_INSIDE', MovetoInside(client=self.speak, ri=self.ri),
+            smach.StateMachine.add('TEACH_INSIDE_POSITION', TeachInsidePosition(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR',
                                                 'aborted':'MOVE_TO_INSIDE'})
             smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR', WaitforNextFloor(client=self.speak),

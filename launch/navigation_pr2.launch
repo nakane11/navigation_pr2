@@ -1,14 +1,10 @@
 <launch>
-  <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
   <arg name="speaker_volume" default="1.0" doc="robot speaking volume" />
   <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
   <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
   <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
-  <arg name="inside_pr2" default="false" />
+  <arg name="inside_pr2" default="true" />
 
-  <include file="$(find navigation_pr2)/launch/speech_recognition.launch" >
-    <arg name="use_vosk" value="$(arg use_vosk)" />
-  </include>
 
   <include file="$(find virtual_force_drag)/launch/pr2_lead.launch" />
 
@@ -35,15 +31,6 @@
   </group>
 
   <group unless="$(arg inside_pr2)" >
-
-    <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
-      <arg name="gui" value="false" />
-      <arg name="gpu" value="-1" />
-      <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
-      <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
-      <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
-      <arg name="with_depth" value="true" />
-    </include>
 
     <node name="spot_map_server"
           pkg="navigation_pr2" type="spot_map_server.py"
@@ -83,12 +70,12 @@
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen" respawn="true"
         clear_params="true" >
-    <remap from="~input1" to="/Tablet/voice/mux" />
+    <remap from="~input1" to="/Tablet/voice_stamped" />
     <!-- <remap from="~input2" to="/robotsound_jp/goal" />  -->
     <remap from="~input2" to="/speak_node/say/goal" />
     <rosparam>
       number_of_input: 2
-      input1_transform: "m.transcript[0]"
+      input1_transform: "m.candidates.transcript[0]"
       input1_color: "red"
       input1_speaker: "people"
       <!-- input2_transform: "m.goal.sound_request.arg" -->
