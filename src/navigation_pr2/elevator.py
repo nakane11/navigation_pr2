@@ -11,6 +11,7 @@ from navigation_pr2.srv import ChangeFloor
 from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from geometry_msgs.msg import Twist
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 class TeachRidingPosition(smach.State):
     def __init__(self, client, listener):

@@ -23,11 +23,11 @@ class NavigationSmach():
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         self.r = skrobot.models.PR2()
-        self.ri = PR2ROSRobotInterface(r)
+        self.ri = PR2ROSRobotInterface(self.r)
 
     def speech_cb(self, msg):
         if msg.header.stamp - self.last_speech_time > rospy.Duration(0):
-            rospy.set_param('~speech_raw', msg.transcript[0])
+            rospy.set_param('~speech_raw', msg.candidates.transcript[0].replace(' ', ''))
             self.last_speech_time = msg.header.stamp
 
     def smach(self):
@@ -68,14 +68,14 @@ class NavigationSmach():
                                                output_keys=['riding_position', 'adjust_riding'])
         with sm_teach_elevator:
             smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener),
-                                   transitions={'succeeded':'MOVE_TO_INSIDE',
+                                   transitions={'succeeded':'TEACH_INSIDE_POSITION',
                                                 'aborted':'TEACH_RIDING_POSITION'})
             smach.StateMachine.add('TEACH_INSIDE_POSITION', TeachInsidePosition(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_TEACHING',
                                                 'aborted':'TEACH_INSIDE_POSITION'})
             smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_TEACHING', WaitforNextFloor(client=self.speak),
                                    transitions={'succeeded':'MOVE_TO_EXIT',
-                                                'aborted':'WAIT_FOR_NEXT_FLOOR'})
+                                                'aborted':'WAIT_FOR_NEXT_FLOOR_TEACHING'})
             smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'TEACH_OUTSIDE_ELEVATOR',
                                                 'aborted':'aborted'})
