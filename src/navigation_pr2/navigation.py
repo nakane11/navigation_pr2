@@ -226,7 +226,8 @@ class CheckIfGoalReached(smach.State):
 class ExecuteState(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'move'],
-                             input_keys=['waypoints', 'next_point'])
+                             input_keys=['waypoints', 'next_point'],
+                             output_keys=['status'])
 
     def execute(self, userdata):
         if self.preempt_requested():
@@ -237,13 +238,18 @@ class ExecuteState(smach.State):
         target_point = waypoints[index]
         print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
         if target_point.type == 0:
+            userdata.status = 'spot'
             return 'move'
+        if target_point.type == 1:
+            userdata.status = 'elevator'
+            return 'move'
+
         return 'succeeded'
 
 class SendMoveTo(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted'],
-                             input_keys=['next_point', 'waypoints'])
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'elevator'],
+                             input_keys=['next_point', 'waypoints', 'status'])
         self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
         self.max_retry = rospy.get_param("~max_retry", 8)
         self.base_frame_id = rospy.get_param('~base_frame_id','base_footprint')
@@ -289,6 +295,8 @@ class SendMoveTo(smach.State):
                 rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
                 return 'aborted'
             rospy.loginfo("{}m to the next waypoint.".format(distance))
+        if userdata.status == 'elevator':
+            return 'elevator'
         return 'succeeded'
 
 class Interrupt(smach.State):
@@ -376,6 +384,8 @@ def con_moving_child_term_cb(outcome_map):
         return True
     if outcome_map['TALK_IN_MOVING'] == 'start mapping':
         return True
+    if outcome_map['SEND_WAYPOINT'] == 'elevator':
+        return True
     else:
         return False
 
@@ -392,6 +402,8 @@ def con_moving_out_cb(outcome_map):
         return 'aborted'
     if outcome_map['TALK_IN_MOVING'] == 'start mapping':
         return 'start mapping'
+    if outcome_map['SEND_WAYPOINT'] == 'elevator':
+        return 'elevator'
            
 
                               

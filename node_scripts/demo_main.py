@@ -22,7 +22,7 @@ class NavigationSmach():
         self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
-        r = skrobot.models.PR2()
+        self.r = skrobot.models.PR2()
         self.ri = PR2ROSRobotInterface(r)
 
     def speech_cb(self, msg):
@@ -63,16 +63,17 @@ class NavigationSmach():
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
 
-        sm_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
-                                         input_keys=['riding_position', 'adjust_riding'])
-        with sm_elevator:
+        sm_teach_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
+                                               input_keys=['riding_position', 'adjust_riding'],
+                                               output_keys=['riding_position', 'adjust_riding'])
+        with sm_teach_elevator:
             smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener),
                                    transitions={'succeeded':'MOVE_TO_INSIDE',
                                                 'aborted':'TEACH_RIDING_POSITION'})
             smach.StateMachine.add('TEACH_INSIDE_POSITION', TeachInsidePosition(client=self.speak, ri=self.ri),
-                                   transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR',
-                                                'aborted':'MOVE_TO_INSIDE'})
-            smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR', WaitforNextFloor(client=self.speak),
+                                   transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_TEACHING',
+                                                'aborted':'TEACH_INSIDE_POSITION'})
+            smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_TEACHING', WaitforNextFloor(client=self.speak),
                                    transitions={'succeeded':'MOVE_TO_EXIT',
                                                 'aborted':'WAIT_FOR_NEXT_FLOOR'})
             smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
@@ -89,7 +90,7 @@ class NavigationSmach():
         sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'])
         with sm_navigation:
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
-                                                     'interrupt', 'aborted', 'start mapping'],
+                                                     'interrupt', 'aborted', 'start mapping', 'elevator'],
                                            input_keys=['waypoints', 'next_point', 'goal_spot'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
@@ -104,7 +105,7 @@ class NavigationSmach():
                                                         'request interrupt':'interrupt',
                                                         'start mapping':'start mapping',
                                                         'aborted':'GET_SPEECH_IN_MOVING'})
-                sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted'],
+                sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted', 'elevator'],
                                                       input_keys=['waypoints', 'next_point', 'goal_spot'])
                 with sm_send_waypoint:
                     smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(client=self.speak),
@@ -118,7 +119,8 @@ class NavigationSmach():
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted',
-                                                        'preempted':'aborted'})
+                                                        'preempted':'aborted',
+                                                        'elevator':'elevator'})
                 sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:
                     smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
@@ -130,6 +132,25 @@ class NavigationSmach():
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
                 smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
+
+            sm_navigation_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
+                                         input_keys=['riding_position', 'adjust_riding'])
+            with sm_navigation_elevator:
+                smach.StateMachine.add('WAIT_FOR_ELEVATOR_AVAILABLE', WaitforElevatorAvailable(client=self.speak),
+                                       transitions={'succeeded':'MOVE_TO_RIDING_POSITION',
+                                                    'aborted':'WAIT_FOR_ELEVATOR_AVAILABLE'})
+                smach.StateMachine.add('MOVE_TO_RIDING_POSITION', MovetoRidingPosition(),
+                                       transitions={'succeeded':'MOVE_TO_INSIDE_POSITION',
+                                                    'aborted':'MOVE_TO_RIDING_POSITION'})
+                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION', MovetoInsidePosition(ri=self.ri),
+                                       transitions={'succeeded':'HOLD_DOOR',
+                                                    'aborted':'MOVE_TO_INSIDE_POSITION'})
+                smach.StateMachine.add('HOLD_DOOR', HoldDoor(model=self.r, ri=self.ri),
+                                       transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_NAVIGATION',
+                                                    'aborted':'aborted'})
+                smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_NAVIGATION', WaitforNextFloor(client=self.speak),
+                                       transitions={'succeeded':'succeeded',
+                                                    'aborted':'aborted'})
 
 
             smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
@@ -154,7 +175,8 @@ class NavigationSmach():
                                                 'start mapping':'start mapping',
                                                 'interrupt':'INTERRUPT',
                                                 'ask':'ASK_WHAT',
-                                                'reached': 'FINISH_NAVIGATION'})
+                                                'reached': 'FINISH_NAVIGATION',
+                                                'elevator':'NAVIGATION_ELEVATOR'})
             smach.StateMachine.add('INTERRUPT', Interrupt(),
                                    transitions={'resume': 'MOVING',
                                                 'aborted':'FINISH_NAVIGATION'})
@@ -165,6 +187,9 @@ class NavigationSmach():
             smach.StateMachine.add('FINISH_NAVIGATION', FinishNavigation(),
                                    transitions={'succeeded': 'succeeded'})
 
+            smach.StateMachine.add('NAVIGATION_ELEVATOR', sm_navigation_elevator,
+                                   transitions={'succeeded': 'MOVING',
+                                                'aborted': 'aborted'})
             
         ###################################
         ####### MAIN STATE MACHINE ########
@@ -200,8 +225,8 @@ class NavigationSmach():
                                    transitions={'outcome':'MAPPING',
                                                 'succeeded':'FINISH_MAPPING',
                                                 'start navigation':'NAVIGATION',
-                                                'elevator':'ELEVATOR'})
-            smach.StateMachine.add('ELEVATOR', sm_elevator,
+                                                'elevator':'TEACH_ELEVATOR'})
+            smach.StateMachine.add('TEACH_ELEVATOR', sm_teach_elevator,
                                    transitions={'succeeded':'MAPPING',
                                                 'aborted':'FINISH_MAPPING'})
             smach.StateMachine.add('FINISH_MAPPING', FinishMapping(),

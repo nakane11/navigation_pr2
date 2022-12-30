@@ -37,7 +37,7 @@ class TeachRidingPosition(smach.State):
         self.speak.parrot(speech_raw)
         return 'aborted'
 
-class MovetoInside(smach.State):
+class TeachInsidePosition(smach.State):
     def __init__(self, client, ri):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],        
                              input_keys=['adjust_riding'],
@@ -210,31 +210,83 @@ class TeachOutsideElevator(smach.State):
         self.speak.say('{}階のエレベータの位置を教えて下さい'.format(floor_name))
         return 'aborted'
 
-class HoldDoor(smach.State):
-    def __init__(self):
+class WaitforElevatorAvailable(smach.State):
+    def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
+        rospy.loginfo('waiting for lead_pr2_action...')
+        self.ac.wait_for_server()
+        self.start = False
+        self.speak = client
 
     def execute(self, userdata):
-        # ドアを押さえておく
-        return
+        # tuckarm
+        if not self.start:
+            # tuckarm
+            goal = SwitchGoal(switch=False)
+            self.ac.send_goal(goal)
+            self.ac.wait_for_result()
+            self.start = True
+        # 音声認識
+        self.speak.say('エレベータが到着したら教えて下さい')
+        if wait_for_speech(timeout=300):
+            speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
+            rospy.delete_param('~speech_raw')
+            if re.search(r'.*到着.*$', speech_raw) is not None:
+                self.speak.say('私が乗り込むまでボタンを押しておいて下さい')
+                return 'succeeded'
+            self.speak.parrot(speech_raw)
+        return 'aborted'
 
-class a(smach.State):
+class MovetoRidingPosition(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['timeout', 'name received', 'end', 'request navigation', 'aborted', 'cancelled'],
-                             output_keys=['new_spot_name'])
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+                             input_keys=['riding_position'])
+        self.mb = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
     def execute(self, userdata):
-        # 到着をまつ
-        return
+        floor_name = rospy.get_param('~floor')
+        elevator_pos = userdata.riding_position[floor_name]
 
-class MoveInsideElevator(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],        
-                             input_keys=[])
+        goal_msg = MoveBaseGoal()
+        goal_msg.target_pose.header.frame_id = 'map'
+        goal_msg.target_pose.pose = elevator_pos
+        rospy.loginfo('Executing move_base goal to position (x,y): %s, %s' %
+                      (elevator_pos.position.x, elevator_pos.position.y))
+        self.mb.send_goal(goal_msg)
+        self.mb.wait_for_result()
+        state = self.mb.get_state()
+        if state == GoalStatus.ABORTED or state == GoalStatus.PREEMPTED:
+            rospy.logwarn('Move_base failed because server received cancel request or goal was aborted')
+            return 'aborted'
+        return 'succeeded'
+
+class MovetoInsidePosition(smach.State):
+    def __init__(self, ri):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+                             input_keys=['adjust_riding'])
+        self.ri = ri
 
     def execute(self, userdata):
-        # エレベータの外に移動
-        return
+        floor_name = rospy.get_param('~floor')
+        diff = userdata.adjust_riding[floor_name]
+        # unsafeで移動
+        self.ri.go_pos_unsafe(x=-diff[0], y=-diff[1])
+        return 'succeeded'
 
-# 中からエレベータ外 -> エレベータ外に移動してから手繋ぎをする
-# 他の場所からエレベータ外 -> エレベータ外に移動してから手繋ぎをやめる->中に移動->
+class HoldDoor(smach.State):
+    def __init__(self, model, ri):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
+        self.r = model
+        self.ri = ri
+
+    def execute(self, userdata):
+        # 人が乗り込むまでドアを押さえておく
+        self.r.rarm.angle_vector(np.deg2rad([19.3756, -6.43574, -36.3081, -26.6661, -196.366, -45.457, 230.06]))
+        self.ri.angle_vector(r.angle_vector(), controller_type='rarm_controller')
+        self.ri.wait_interpolation()
+        # 乗り込んだらtuckarm
+        self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
+        self.ri.angle_vector(r.angle_vector(), controller_type='rarm_controller')
+        self.ri.wait_interpolation()
+        return 'succeeded'
