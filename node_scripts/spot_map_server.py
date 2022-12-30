@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import struct
 import threading
 import networkx as nx
 import rospy
@@ -18,6 +19,11 @@ from navigation_pr2.srv import Path, PathResponse
 from navigation_pr2.msg import Node
 from navigation_pr2.srv import ListSpotName, ListSpotNameResponse
 
+def convert_string_to_bytes(string):
+    bytes = b''
+    for i in string:
+        bytes += struct.pack("B", ord(i))
+    return bytes
 
 class SpotMapServer(object):
     def __init__(self, lock):
@@ -157,6 +163,7 @@ class SpotMapServer(object):
 
     def find_path_cb(self, req):
         goal = req.goal_name
+        print("goal:{}".format(goal))
         resp = PathResponse(result=0)
         result_array=[]
         goal_graph_dict = {}
@@ -172,12 +179,19 @@ class SpotMapServer(object):
         for name, graph in self.graph_dict.items():
             goal_graph = None
             goal_floor = None
-            if goal in list(graph.nodes):
+            print(type(goal))
+            print(type(list(graph.nodes)[0]))
+            for i in list(map(convert_string_to_bytes, list(graph.nodes))):
+                print(i)
+            if goal in map(convert_string_to_bytes, list(graph.nodes)):
                 goal_graph_dict[name] = graph
                 goal_floor = name
                 goal_floor_array.append(goal_floor)
+        for i in list(map(convert_string_to_bytes, list(self.active_graph.nodes))):
+            print(i)
 
-        if goal in list(self.active_graph.nodes):
+        if goal in map(convert_string_to_bytes, list(self.active_graph.nodes)):
+            print("{} graph:{}".format(name,list(map(convert_string_to_bytes, list(self.active_graph.nodes)))))
             goal_graph_dict[self.active_graph_name] = self.active_graph
             goal_floor = self.active_graph_name
             goal_floor_array.append(goal_floor)
@@ -187,7 +201,7 @@ class SpotMapServer(object):
 
         for floor in goal_floor_array:
             goal_graph = goal_graph_dict[floor]
-            print("goal_graph:{}".format(list(goal_graph.nodes)))
+            print("floor{} goal_graph:{}".format(floor, list(map(convert_string_to_bytes, list(goal_graph.nodes)))))
             waypoints = []
             try:
                 #同じ階
@@ -200,11 +214,13 @@ class SpotMapServer(object):
                 else:
                     for i in list(self.active_graph.nodes):
                         n = self.active_graph.nodes[i]
+                        print("[source] name:{}, type:{}".format(i, n['type']))
                         if n['type'] == 1:
                             elevator_source = i
                             break
                     for i in list(goal_graph.nodes):
-                        n = self.active_graph.nodes[i]
+                        n = goal_graph.nodes[i]
+                        print("[target] name:{}, type:{}".format(i, n['type']))
                         if n['type'] == 1:
                             elevator_target = i
                             break
@@ -213,7 +229,7 @@ class SpotMapServer(object):
                         waypoints_length.append(0)
                         continue
                     if elevator_source and elevator_target:
-                        path_list_source_floor = nx.shortest_path(goal_graph, source=self.start_node, target=elevator_source)
+                        path_list_source_floor = nx.shortest_path(self.active_graph, source=start_node, target=elevator_source)
                         path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
                         for i in path_list_source_floor:
                             node = self.node_to_msg(i, self.active_graph.nodes[i])
