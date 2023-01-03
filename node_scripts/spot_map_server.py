@@ -142,13 +142,16 @@ class SpotMapServer(object):
             if goal.command == 0:
                 self.add_spot(pose)
             elif goal.command == 1:
+                print(goal.name)
                 self.add_spot(pose, goal.name)
             elif goal.command == 2:
                 self.remove_spot(name)
             elif goal.command == 3:
+                print(goal.name)
                 self.add_spot(pose, goal.name)
                 self.update_spot_info(goal.name, goal.node, goal.update_keys)
             elif goal.command == 4:
+                print(goal.name)
                 self.update_spot_info(goal.name, goal.node, goal.update_keys)
         result = RecordSpotResult(result=True)
         self.add.set_succeeded(result)
@@ -170,7 +173,13 @@ class SpotMapServer(object):
         goal_floor_array=[]
         waypoints_array = []
         waypoints_length = []
-        curr_pose = self.get_robotpose()
+        curr_pose = None
+        while True:
+            curr_pose = self.get_robotpose()
+            if curr_pose is not False:
+                break
+            else:
+                print('failed to get current position')
         start_node_candidates = list(self.active_graph.nodes)
         start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
         start_node = start_node_candidates[0]
@@ -329,7 +338,7 @@ class SpotMapServer(object):
                         rospy.loginfo('Add edge {} to {}'.format(self.current_node, i))
                         self.current_node = i
                     if name :
-                        node_name = name[0]
+                        node_name = name
                         mapping = {i: node_name}
                         self.active_graph = nx.relabel_nodes(self.active_graph, mapping)
                         self.active_graph.nodes[node_name]['name'] = True
