@@ -1,0 +1,27 @@
+<launch>
+  <param name="/use_sim_time" value="true" />
+  
+  <node name="rosbag_play"
+        pkg="rosbag" type="play"
+        args="$(find navigation_pr2)/sample/data/move_wrist.bag --clock --loop">
+  </node>
+ 
+  <group ns="/kinect_head/rgb/throttled">
+    <node name="republish"
+          pkg="image_transport" type="republish"
+          args="compressed raw">
+      <remap from="in" to="image_rect_color" />
+      <remap from="out" to="image_rect_color" />
+    </node>
+  </group>
+
+  <group ns="/kinect_head/depth_registered/throttled">
+    <node name="republish"
+          pkg="image_transport" type="republish"
+          args="compressedDepth raw">
+      <remap from="in" to="image_rect" />
+      <remap from="out" to="image_rect" />
+    </node>
+  </group>
+
+</launch>

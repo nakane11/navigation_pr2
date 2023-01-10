@@ -1,0 +1,17 @@
+<launch>
+  <arg name="INPUT_IMAGE" default="/kinect_head/rgb/throttled/image_rect_color" />
+  <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/throttled/image_rect" />
+  <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/throttled/camera_info" />
+
+  <include file="$(find navigation_pr2)/sample/include/play_rosbag_wrist.xml" />
+
+  <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
+    <arg name="gui" value="false" />
+    <arg name="gpu" value="-1" />
+    <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
+    <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
+    <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
+    <arg name="with_depth" value="true" />
+  </include>
+
+</launch>

@@ -26,7 +26,7 @@
   t)
 
 (defun hand-pose-subscriber ()
-  (send *pr2* :head :angle-vector #f(0.0 14.694))
+  (send *pr2* :head :angle-vector #f(0.0 23.226))
   (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :head-controller)
   (setq hand-pose-array (one-shot-subscribe "/hand_pose_estimation_2d/output/pose" jsk_recognition_msgs::HandPoseArray))
   (when (> (length (send hand-pose-array :poses)) 0)
