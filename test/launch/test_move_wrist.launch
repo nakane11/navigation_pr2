@@ -1,0 +1,34 @@
+<launch>
+  <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
+  <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
+  <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
+  
+  <node name="speak_node"
+        pkg="navigation_pr2" type="speak.py"
+        respawn="true" >
+    <rosparam subst_value="true">
+      volume: 1.0
+    </rosparam>
+  </node>
+
+  <node name="move_wrist_test"
+        pkg="navigation_pr2" type="move_wrist.py"
+        output="screen"
+        clear_params="true" >
+  </node>
+
+  <node pkg="roseus" type="roseus" name="move_wrist" respawn="true"
+        output="screen"
+        args="$(find navigation_pr2)/euslisp/holding-hand.l" >
+  </node>
+
+  <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
+    <arg name="gui" value="false" />
+    <arg name="gpu" value="-1" />
+    <arg name="INPUT_IMAGE" value="$(arg INPUT_IMAGE)" />
+    <arg name="INPUT_DEPTH_IMAGE" value="$(arg INPUT_DEPTH_IMAGE)" />
+    <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
+    <arg name="with_depth" value="true" />
+  </include>
+  
+</launch>
