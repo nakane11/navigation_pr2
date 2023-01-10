@@ -110,6 +110,7 @@
   <group unless="$(arg use_vosk)" >  
     <node name="speech_recognition"
           pkg="ros_speech_recognition" type="speech_recognition_node.py"
+          output="screen"
           respawn="true" >
       <rosparam subst_value="true">
         audio_topic: $(arg audio_topic)
@@ -127,23 +128,23 @@
     </node>
   </group>
 
-  <node name="input_sr_mux" pkg="topic_tools" type="mux"
-        respawn="true"
-	args="/Tablet/voice/mux /Tablet/voice /Tablet/voice/whisper_filtered">
-    <remap from="mux" to="input_sr_mux" />
-  </node>
+  <!-- <node name="input_sr_mux" pkg="topic_tools" type="mux" -->
+  <!--       respawn="true" -->
+  <!--   args="/Tablet/voice/mux /Tablet/voice /Tablet/voice/whisper_filtered"> -->
+  <!--   <remap from="mux" to="input_sr_mux" /> -->
+  <!-- </node> -->
 
-  <node pkg="jsk_robot_startup" type="mux_selector.py" name="sr_selector"
-        respawn="true" output="screen" clear_params="true"
-        args="/Tablet/voice 'True' /Tablet/voice /Tablet/voice/whisper_filtered 'True' /Tablet/voice/whisper_filtered">
-    <remap from="mux" to="input_sr_mux" />
-    <rosparam subst_value="true">
-      topics:
-        - name: /Tablet/voice
-          type: speech_recognition_msgs/SpeechRecognitionCandidates
-        - name: /Tablet/voice/whisper_filtered
-          type: speech_recognition_msgs/SpeechRecognitionCandidates
-    </rosparam>
-  </node>
+  <!-- <node pkg="jsk_robot_startup" type="mux_selector.py" name="sr_selector" -->
+  <!--       respawn="true" output="screen" clear_params="true" -->
+  <!--       args="/Tablet/voice 'True' /Tablet/voice /Tablet/voice/whisper_filtered 'True' /Tablet/voice/whisper_filtered"> -->
+  <!--   <remap from="mux" to="input_sr_mux" /> -->
+  <!--   <rosparam subst_value="true"> -->
+  <!--     topics: -->
+  <!--       - name: /Tablet/voice -->
+  <!--         type: speech_recognition_msgs/SpeechRecognitionCandidates -->
+  <!--       - name: /Tablet/voice/whisper_filtered -->
+  <!--         type: speech_recognition_msgs/SpeechRecognitionCandidates -->
+  <!--   </rosparam> -->
+  <!-- </node> -->
 
 </launch>
