@@ -23,6 +23,10 @@ class WaitForTeaching(smach.State):
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        rospy.loginfo('waiting for spot_map_server/stop...')
+        rospy.wait_for_service('spot_map_server/stop')
+        self.stop = rospy.ServiceProxy('spot_map_server/stop', Empty)
+
         if self.multiple_floor:
             # rospy.loginfo('waiting for map_manager/change_floor...')
             # rospy.wait_for_service('/map_manager/change_floor')
@@ -37,6 +41,7 @@ class WaitForTeaching(smach.State):
             self.ac.send_goal(goal)
             rospy.loginfo('waiting for change_floor result...')
             self.ac.wait_for_result()
+
         self.initialized = False
         self.last_spot_name = ''
 
@@ -105,6 +110,7 @@ class WaitForTeaching(smach.State):
         if re.findall('終了', speech_raw):
             print(self.floor_name)
             floor_name = floors[self.floor_name]
+            self.stop()
             if self.multiple_floor:
                 goal = ChangeFloorGoal()
                 goal.command = 2
