@@ -90,11 +90,13 @@ class NavigationSmach():
         ###########  NAVIGATION  ##########
         ###################################
         print(1)
-        sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'])
+        sm_navigation = smach.StateMachine(outcomes=['succeeded', 'aborted', 'start mapping'],
+                                           input_keys=['riding_position', 'adjust_riding'])
         with sm_navigation:
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping', 'elevator'],
-                                           input_keys=['waypoints', 'next_point', 'goal_spot'],
+                                           input_keys=['waypoints', 'next_point', 'goal_spot', 'status'],
+                                           output_keys=['next_point'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
                                            outcome_cb=con_moving_out_cb)
@@ -109,7 +111,8 @@ class NavigationSmach():
                                                         'start mapping':'start mapping',
                                                         'aborted':'GET_SPEECH_IN_MOVING'})
                 sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted', 'elevator'],
-                                                      input_keys=['waypoints', 'next_point', 'goal_spot'])
+                                                      input_keys=['waypoints', 'next_point', 'goal_spot', 'status'],
+                                                      output_keys=['next_point'])
                 with sm_send_waypoint:
                     smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(client=self.speak),
                                            transitions={'succeeded':'succeeded',
