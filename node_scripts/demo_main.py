@@ -20,13 +20,15 @@ class NavigationSmach():
         rospy.init_node('navigation_state_machine')
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
-        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         self.r = skrobot.models.PR2()
         self.ri = PR2ROSRobotInterface(self.r)
 
     def speech_cb(self, msg):
+        if msg.candidates.confidence < 0.3:
+            return
         if msg.header.stamp - self.last_speech_time > rospy.Duration(0) or self.debug:
             rospy.set_param('~speech_raw', msg.candidates.transcript[0].replace(' ', ''))
             self.last_speech_time = msg.header.stamp

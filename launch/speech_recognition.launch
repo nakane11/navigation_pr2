@@ -128,23 +128,26 @@
     </node>
   </group>
 
-  <!-- <node name="input_sr_mux" pkg="topic_tools" type="mux" -->
-  <!--       respawn="true" -->
-  <!--   args="/Tablet/voice/mux /Tablet/voice /Tablet/voice/whisper_filtered"> -->
-  <!--   <remap from="mux" to="input_sr_mux" /> -->
-  <!-- </node> -->
+  <node name="ping" pkg="navigation_pr2" type="ping.py"
+        respawn="true" >
+    <param name="tries" value="1" />
+    <param name="timeout" value="2" />
+    <param name="host" value="8.8.8.8" />
+  </node>
 
-  <!-- <node pkg="jsk_robot_startup" type="mux_selector.py" name="sr_selector" -->
-  <!--       respawn="true" output="screen" clear_params="true" -->
-  <!--       args="/Tablet/voice 'True' /Tablet/voice /Tablet/voice/whisper_filtered 'True' /Tablet/voice/whisper_filtered"> -->
-  <!--   <remap from="mux" to="input_sr_mux" /> -->
-  <!--   <rosparam subst_value="true"> -->
-  <!--     topics: -->
-  <!--       - name: /Tablet/voice -->
-  <!--         type: speech_recognition_msgs/SpeechRecognitionCandidates -->
-  <!--       - name: /Tablet/voice/whisper_filtered -->
-  <!--         type: speech_recognition_msgs/SpeechRecognitionCandidates -->
-  <!--   </rosparam> -->
-  <!-- </node> -->
+
+  <node name="input_sr_mux" pkg="topic_tools" type="mux"
+        respawn="true"
+        args="/Tablet/voice_stamped/mux /Tablet/voice_stamped/google /Tablet/voice_stamped">
+    <remap from="mux" to="input_sr_mux" />
+  </node>
+
+  <node pkg="jsk_robot_startup" type="mux_selector.py" name="sr_selector"
+        respawn="true" output="screen" clear_params="true"
+        args="/ping 'm.data is True' /Tablet/voice_stamped/google /ping 'm.data is False' /Tablet/voice_stamped">
+    <remap from="mux" to="input_sr_mux" />
+    <param name="default_select" value="/Tablet/voice_stamped/google" />
+    <param name="wait" value="true" />
+  </node>
 
 </launch>
