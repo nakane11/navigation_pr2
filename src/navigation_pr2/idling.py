@@ -4,14 +4,25 @@
 import rospy
 import smach
 import re
+import actionlib
 import dynamic_reconfigure.client
 from navigation_pr2.utils import *
 from navigation_pr2.srv import ListSpotName
+from navigation_pr2.srv import Path, ChangeFloor
+from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
 
 class Idling(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['timeout', 'start navigation', 'start mapping', 'end', 'aborted', 'intro', 'list spots'])
         self.speak = client
+        self.multiple_floor = rospy.get_param('~multiple_floor', True)
+        rospy.loginfo('waiting for spot_map_server/change_floor...')
+        rospy.wait_for_service('/spot_map_server/change_floor')
+        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
+        if self.multiple_floor:
+            self.ac = actionlib.SimpleActionClient('map_manager/change_floor', ChangeFloorAction)
+            rospy.loginfo('waiting for map_manager/change_floor...')
+            self.ac.wait_for_server()
 
     def execute(self, userdata):
         if not wait_for_speech(timeout=50):
@@ -22,7 +33,8 @@ class Idling(smach.State):
         if re.search(r'.*案内.*$', speech_raw):
             return 'start navigation'
         if re.search(r'.*覚え.*$', speech_raw):
-           return 'start mapping'
+            self.speak.say('はい。よろしくお願いします')
+            return 'start mapping'
         if re.search(r'.*終了.*$', speech_raw):
             return 'end'
         if re.search(r'.*こんにちは.*$', speech_raw):
@@ -30,6 +42,22 @@ class Idling(smach.State):
             return 'intro'
         if re.search(r'.*どこに行け.*$', speech_raw):
             return 'list spots'
+        if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+            floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
+            self.speak.say('{}階ですね。'.format(floor_name))
+            floor_name = floors[floor_name]
+            self.eus_floor(floor=floor_name)
+            if self.multiple_floor:
+                self.speak.say('地図を変えるので待って下さい')
+                goal = ChangeFloorGoal()
+                goal.command = 1
+                goal.floor = floor_name
+                self.ac.send_goal(goal)
+                rospy.loginfo('waiting for change_floor result...')
+                self.ac.wait_for_result()
+                self.speak.say('お待たせしました')
+            rospy.set_param('~floor', floor_name)
+            return 'aborted'
         self.speak.parrot(speech_raw)
         return 'aborted'
 
@@ -109,6 +137,3 @@ class ListSpots(smach.State):
         self.speak.say('以上です')
         return 'succeeded'
 
-# wait
-# explain use
-# explain available spots
