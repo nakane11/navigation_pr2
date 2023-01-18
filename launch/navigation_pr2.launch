@@ -1,8 +1,5 @@
 <launch>
   <arg name="speaker_volume" default="1.0" doc="robot speaking volume" />
-  <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
-  <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
-  <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
   <arg name="inside_pr2" default="true" />
 
 
@@ -70,7 +67,7 @@
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen" respawn="true"
         clear_params="true" >
-    <remap from="~input1" to="/Tablet/voice_stamped" />
+    <remap from="~input1" to="/Tablet/voice_stamped/mux" />
     <!-- <remap from="~input2" to="/robotsound_jp/goal" />  -->
     <remap from="~input2" to="/speak_node/say/goal" />
     <rosparam>
