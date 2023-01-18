@@ -18,7 +18,7 @@ class WaitForTeaching(smach.State):
                                              'description received', 'end',\
                                              'request navigation', 'aborted', 'cancelled'],
                              output_keys=['new_spot_name', 'new_description'])
-        self.multiple_floor = rospy.get_param('~multiple_floor')
+        self.multiple_floor = rospy.get_param('~multiple_floor', True)
         self.speak = client
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
@@ -28,10 +28,6 @@ class WaitForTeaching(smach.State):
         self.stop = rospy.ServiceProxy('spot_map_server/stop', Empty)
 
         if self.multiple_floor:
-            # rospy.loginfo('waiting for map_manager/change_floor...')
-            # rospy.wait_for_service('/map_manager/change_floor')
-            # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
-            # self.py_floor(command=0, floor='empty')
             self.ac = actionlib.SimpleActionClient('map_manager/change_floor', ChangeFloorAction)
             rospy.loginfo('waiting for map_manager/change_floor...')
             self.ac.wait_for_server()
@@ -67,7 +63,6 @@ class WaitForTeaching(smach.State):
                             rospy.loginfo('waiting for change_floor result...')
                             self.ac.wait_for_result()
                             self.speak.say('準備完了です')
-                            # self.py_floor(command=1, floor=floor_name)
                         rospy.set_param('~floor', floor_name)
                         break
                 else:
@@ -75,7 +70,7 @@ class WaitForTeaching(smach.State):
             self.initialized = True
             return 'aborted'
 
-        if not wait_for_speech(timeout=30):
+        if not wait_for_speech(timeout=60):
             return 'timeout'
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
         rospy.delete_param('~speech_raw')
@@ -129,11 +124,15 @@ class WaitForTeaching(smach.State):
 class StartMapping(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
+        self.debug = rospy.get_param('~debug', False)
         self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
         rospy.loginfo('waiting for lead_pr2_action...')
         self.ac.wait_for_server()
 
     def execute(self, userdata):
+        if self.debug:
+            rospy.loginfo('skipped switch goal')
+            return 'succeeded'
         goal = SwitchGoal(switch=True)
         self.ac.send_goal(goal)
         return 'succeeded'
@@ -141,11 +140,15 @@ class StartMapping(smach.State):
 class FinishMapping(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
+        self.debug = rospy.get_param('~debug', False)
         self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
         rospy.loginfo('waiting for lead_pr2_action...')
         self.ac.wait_for_server()
 
     def execute(self, userdata):
+        if self.debug:
+            rospy.loginfo('skipped switch goal')
+            return 'succeeded'
         goal = SwitchGoal(switch=False)
         self.ac.send_goal(goal)
         return 'succeeded'
@@ -257,11 +260,12 @@ class SwitchRecordWithoutName(smach.State):
             rospy.sleep(1.0)
 
 class ExplainMapping(smach.State):
-    def __init__(self):
+    def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded'])
-
+        self.speak = client
     def execute(self, userdata):
         # speak
+        self.speak.say('お困りですか？「ここが研究室だよ」というように場所の名前を教えて下さい。')
         return 'succeeded'
 
 def con_mapping_child_term_cb(outcome_map):
