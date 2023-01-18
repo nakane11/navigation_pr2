@@ -181,8 +181,9 @@ class SpotMapServer(object):
             else:
                 print('failed to get current position')
         start_node_candidates = list(self.active_graph.nodes)
-        start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
-        start_node = start_node_candidates[0]
+        if len(start_node_candidates) > 0:
+            start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
+            start_node = start_node_candidates[0]
 
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
