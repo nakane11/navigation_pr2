@@ -12,6 +12,7 @@ from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
 from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from actionlib_msgs.msg import GoalStatus
 
 class TeachRidingPosition(smach.State):
     def __init__(self, client, listener):
@@ -33,6 +34,7 @@ class TeachRidingPosition(smach.State):
                 floor_name = rospy.get_param('~floor')
                 tmp[floor_name] = pos
                 userdata.riding_position = tmp
+                print(tmp)
                 self.speak.say('はい')
                 return 'succeeded'
         self.speak.parrot(speech_raw)
@@ -43,6 +45,7 @@ class TeachInsidePosition(smach.State):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],        
                              input_keys=['adjust_riding'],
                              output_keys=['adjust_riding'])
+        self.debug = rospy.get_param('~debug', False)
         self.pub = rospy.Publisher('/input_vel', Twist, queue_size=1)
         self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
         rospy.loginfo('waiting for lead_pr2_action...')
@@ -54,9 +57,12 @@ class TeachInsidePosition(smach.State):
     def execute(self, userdata):
         if not self.start:
             # tuckarm
-            goal = SwitchGoal(switch=False)
-            self.ac.send_goal(goal)
-            self.ac.wait_for_result()
+            if self.debug:
+                rospy.loginfo('skipped switchgoal')
+            else:
+                goal = SwitchGoal(switch=False)
+                self.ac.send_goal(goal)
+                self.ac.wait_for_result()
             self.speak.say('乗り込み位置を教えて下さい')
             self.start_odom = self.ri.odom
             self.start = True
@@ -109,9 +115,9 @@ class TeachInsidePosition(smach.State):
 class WaitforNextFloor(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
-                             input_keys=['adjust_riding'],
-                             output_keys=['adjust_riding'])
-        self.multiple_floor = rospy.get_param('~multiple_floor')
+                             input_keys=['adjust_riding', 'riding_position'],
+                             output_keys=['adjust_riding', 'riding_position'])
+        self.multiple_floor = rospy.get_param('~multiple_floor', True)
         self.speak = client
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         rospy.loginfo('waiting for spot_map_server/change_floor...')
@@ -124,7 +130,8 @@ class WaitforNextFloor(smach.State):
         
     def execute(self, userdata):
         current_floor_name = rospy.get_param('~floor')
-        tmp = userdata.adjust_riding
+        tmp_a = userdata.adjust_riding
+        tmp_b = userdata.riding_position
         # 到着をまつ
         rospy.loginfo('waiting ...')
         if wait_for_speech(timeout=300):
@@ -134,8 +141,10 @@ class WaitforNextFloor(smach.State):
                 self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
                 self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
                 floor_name = floors[self.floor_name]
-                tmp[floor_name] = userdata.adjust_riding[current_floor_name]
-                userdata.adjust_riding = tmp
+                tmp_a[floor_name] = userdata.adjust_riding[current_floor_name]
+                tmp_b[floor_name] = userdata.riding_position[current_floor_name]
+                userdata.adjust_riding = tmp_a
+                userdata.riding_position = tmp_b
                 self.eus_floor(floor=floor_name)
                 if self.multiple_floor:
                     goal = ChangeFloorGoal()
@@ -158,6 +167,7 @@ class MovetoExit(smach.State):
         self.ac = actionlib.SimpleActionClient('/lead_pr2_action', SwitchAction)
         rospy.loginfo('waiting for lead_pr2_action...')
         self.ac.wait_for_server()
+        self.debug = rospy.get_param('~debug', False)
         self.ri = ri
         self.speak = client
 
@@ -165,6 +175,9 @@ class MovetoExit(smach.State):
         # 降車位置に移動
         floor_name = rospy.get_param('~floor')
         diff = userdata.adjust_riding[floor_name]
+        if self.debug:
+            rospy.loginfo('skipped go_pos_unsafe')
+            return 'succeeded'
         self.ri.go_pos_unsafe(x=diff[0], y=diff[1])
         # 腕を出す
         goal = SwitchGoal(switch=True)
@@ -219,10 +232,12 @@ class WaitforElevatorAvailable(smach.State):
         self.ac.wait_for_server()
         self.start = False
         self.speak = client
+        self.mb = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
     def execute(self, userdata):
         # tuckarm
         if not self.start:
+            self.mb.cancel_all_goals()
             # tuckarm
             goal = SwitchGoal(switch=False)
             self.ac.send_goal(goal)
@@ -246,6 +261,7 @@ class MovetoRidingPosition(smach.State):
         self.mb = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
     def execute(self, userdata):
+        print(userdata.riding_position)
         floor_name = rospy.get_param('~floor')
         elevator_pos = userdata.riding_position[floor_name]
 
@@ -284,10 +300,10 @@ class HoldDoor(smach.State):
     def execute(self, userdata):
         # 人が乗り込むまでドアを押さえておく
         self.r.rarm.angle_vector(np.deg2rad([19.3756, -6.43574, -36.3081, -26.6661, -196.366, -45.457, 230.06]))
-        self.ri.angle_vector(r.angle_vector(), controller_type='rarm_controller')
+        self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
         self.ri.wait_interpolation()
         # 乗り込んだらtuckarm
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
-        self.ri.angle_vector(r.angle_vector(), controller_type='rarm_controller')
+        self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
         self.ri.wait_interpolation()
         return 'succeeded'

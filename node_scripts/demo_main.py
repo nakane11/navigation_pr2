@@ -61,7 +61,7 @@ class NavigationSmach():
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
                 smach.StateMachine.add('SEND_CANCEL_NAME', SendCancelName(),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
-                smach.StateMachine.add('EXPLAIN', ExplainMapping(),
+                smach.StateMachine.add('EXPLAIN', ExplainMapping(client=self.speak),
                                        transitions={'succeeded':'WAIT_FOR_TEACHING'})
             smach.Concurrence.add('RECORD_WITH_NAME', sm_record_with_name)
             smach.Concurrence.add('RECORD_WITHOUT_NAME', SwitchRecordWithoutName())
@@ -96,7 +96,7 @@ class NavigationSmach():
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping', 'elevator'],
                                            input_keys=['waypoints', 'next_point', 'goal_spot', 'status'],
-                                           output_keys=['next_point'],
+                                           output_keys=['next_point', 'status'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
                                            outcome_cb=con_moving_out_cb)
@@ -112,7 +112,7 @@ class NavigationSmach():
                                                         'aborted':'GET_SPEECH_IN_MOVING'})
                 sm_send_waypoint = smach.StateMachine(outcomes=['preempted', 'succeeded', 'aborted', 'elevator'],
                                                       input_keys=['waypoints', 'next_point', 'goal_spot', 'status'],
-                                                      output_keys=['next_point'])
+                                                      output_keys=['next_point', 'status'])
                 with sm_send_waypoint:
                     smach.StateMachine.add('CHECK_IF_GOAL_REACHED', CheckIfGoalReached(client=self.speak),
                                            transitions={'succeeded':'succeeded',

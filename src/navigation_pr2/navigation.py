@@ -50,8 +50,8 @@ class GetWaypoints(smach.State):
         self.speak.say('経路を探します。')
         res = self.call(goal_name=goal_name)
         res.result = np.frombuffer(res.result, dtype=np.uint8)
-        print(res.result)
         res.waypoints_length = np.frombuffer(res.waypoints_length, dtype=np.uint8)
+        print("result:{} floor:{} length:{}".format(res.result, res.goal_floor, res.waypoints_length))
 
         # 一つも見つからなかった場合
         if np.all(res.result == [1]):
@@ -89,7 +89,7 @@ class GetWaypoints(smach.State):
                 target_floor = floor_list[0]
                 userdata.waypoints = path_known[floor_list[0]]
                 if target_floor != current_floor:
-                    target_floor = [k for k, v in floors.items() if v == current_floor][0]
+                    target_floor = [k for k, v in floors.items() if v == target_floor][0]
                     self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), target_floor))
                 userdata.next_point = -1
                 return 'ready to move'
@@ -160,7 +160,7 @@ class SuggestGoals(smach.State):
 class GetSpeechinMoving(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['preempted', 'end', 'request interrupt', 'start mapping', 'aborted'])
-        self.multiple_floor = rospy.get_param('~multiple_floor')
+        self.multiple_floor = rospy.get_param('~multiple_floor', True)
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('/spot_map_server/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
@@ -185,6 +185,7 @@ class GetSpeechinMoving(smach.State):
         if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
             floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
             self.speak.say('{}階ですね。'.format(floor_name))
+            floor_name = floors[floor_name]
             self.eus_floor(floor=floor_name)
             if self.multiple_floor:
                 self.speak.say('地図を変えるので待って下さい')
@@ -211,7 +212,7 @@ class CheckIfGoalReached(smach.State):
         if self.preempt_requested():
             self.service_preempt()
             return 'preempted'
-        goal_name = userdata.goal_spot
+        goal_name = userdata['goal_spot']
         next_point = userdata['next_point']
         waypoints = userdata['waypoints']
         if next_point > -1:
@@ -221,12 +222,13 @@ class CheckIfGoalReached(smach.State):
         userdata.next_point = next_point + 1
         if len(waypoints) <= next_point + 1:
             return 'aborted'
+        print('{}/{}'.format(userdata.next_point, len(waypoints)))
         return 'unreached'
 
 class ExecuteState(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'move'],
-                             input_keys=['waypoints', 'next_point'],
+                             input_keys=['waypoints', 'next_point', 'status'],
                              output_keys=['status'])
 
     def execute(self, userdata):
@@ -235,13 +237,17 @@ class ExecuteState(smach.State):
             return 'preempted'
         waypoints = userdata['waypoints']
         index = userdata['next_point']
+        status = userdata['status']
         target_point = waypoints[index]
         print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
         if target_point.type == 0:
             userdata.status = 'spot'
             return 'move'
         if target_point.type == 1:
-            userdata.status = 'elevator'
+            if status != 'elevator':
+                userdata.status = 'elevator'
+            else:
+                userdata.status = 'spot'
             return 'move'
 
         return 'succeeded'
@@ -250,12 +256,14 @@ class SendMoveTo(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'elevator'],
                              input_keys=['next_point', 'waypoints', 'status'])
+        self.debug = rospy.get_param('~debug', False)
         self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
         self.max_retry = rospy.get_param("~max_retry", 8)
         self.base_frame_id = rospy.get_param('~base_frame_id','base_footprint')
         self.goal_frame_id = rospy.get_param('~goal_frame_id','map')
         self.listener = tf.TransformListener()
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
 
     def execute(self, userdata):
         if self.preempt_requested():
@@ -271,7 +279,10 @@ class SendMoveTo(smach.State):
         goal_msg.target_pose.pose.orientation = waypoint.pose.orientation
         rospy.loginfo('Executing move_base goal to position (x,y): %s, %s' %
                       (waypoint.pose.position.x, waypoint.pose.position.y))
-        self.client.send_goal(goal_msg)
+        if self.debug:
+            rospy.loginfo('skipped send_goal')
+        else:
+            self.client.send_goal(goal_msg)
 
         retry_count = 0
         distance = 10
@@ -295,7 +306,9 @@ class SendMoveTo(smach.State):
                 rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
                 return 'aborted'
             rospy.loginfo("{}m to the next waypoint.".format(distance))
-        if userdata.status == 'elevator':
+        if userdata['status'] == 'elevator':
+            if not self.debug:
+                ret = self.controller(['l_arm_controller'], [], None)
             return 'elevator'
         return 'succeeded'
 
@@ -318,7 +331,8 @@ class Interrupt(smach.State):
 class FinishNavigation(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
-        self.use_hand = rospy.get_param('~use_hand')
+        self.use_hand = rospy.get_param('~use_hand', False)
+        self.debug = rospy.get_param('~debug', False)
         if self.use_hand:
             self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
             rospy.loginfo('waiting for start_hand_holding...')
@@ -329,6 +343,9 @@ class FinishNavigation(smach.State):
 
     def execute(self, userdata):
         # 手繋ぎをやめる
+        if self.debug:
+            rospy.loginfo('skipped finishnavigation')
+            return 'succeeded'
         ret = self.controller(['l_arm_controller'], [], None)
         if self.use_hand:
             goal = StartHoldingGoal(command=3)
@@ -338,15 +355,16 @@ class FinishNavigation(smach.State):
 
 class StartNavigation(smach.State):
     def __init__(self, client):
-        smach.State.__init__(self, outcomes=['succeeded', 'timeout'])
-        self.use_hand = rospy.get_param('~use_hand')
+        smach.State.__init__(self, outcomes=['succeeded', 'timeout'], output_keys=['status'])
+        self.use_hand = rospy.get_param('~use_hand', False)
+        self.debug = rospy.get_param('~debug', False)
         if self.use_hand:
             self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
             rospy.loginfo('waiting for start_hand_holding...')
             self.hand_client.wait_for_server()
-        self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
-        rospy.loginfo('waiting for moving_wrist...')
-        self.wrist_client.wait_for_server()
+            self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
+            rospy.loginfo('waiting for moving_wrist...')
+            self.wrist_client.wait_for_server()
         rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
@@ -354,14 +372,17 @@ class StartNavigation(smach.State):
 
     def execute(self, userdata):
         self.speak.say('正面に立って下さい')
-        goal = MoveWristGoal()
-        self.wrist_client.send_goal(goal)
-        if not self.wrist_client.wait_for_result(timeout=rospy.Duration(40)):
-            self.wrist_client.cancel_all_goals()
-            self.speak.say('中断しました')
-            return 'timeout'
+        if self.debug:
+            rospy.loginfo('skipped move_wrist')
+        else:
+            goal = MoveWristGoal()
+            self.wrist_client.send_goal(goal)
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(40)):
+                self.wrist_client.cancel_all_goals()
+                self.speak.say('中断しました')
+                return 'timeout'
         self.speak.say('手を繋いで下さい')
-        # 手繋ぎ
+            # 手繋ぎ
         if self.use_hand:
             goal = StartHoldingGoal(command=0)
             self.hand_client.send_goal(goal)
@@ -370,9 +391,15 @@ class StartNavigation(smach.State):
                 self.speak.say('中断しました')
                 return 'timeout'
             print(self.hand_client.get_result())
-        ret = self.controller([], ['l_arm_controller'], None)
-        print(ret)
+        else:
+            rospy.loginfo('skipped hand holding')
+        if not self.debug:
+            ret = self.controller([], ['l_arm_controller'], None)
+            print(ret)
+        else:
+            rospy.loginfo('skiopped seitch controller')
         self.speak.say('案内を開始します')
+        userdata.status = ''
         return 'succeeded'
 
 def con_moving_child_term_cb(outcome_map):
