@@ -25,7 +25,7 @@ class Idling(smach.State):
             self.ac.wait_for_server()
 
     def execute(self, userdata):
-        if not wait_for_speech(timeout=50):
+        if not wait_for_speech(timeout=120):
             return 'timeout'
         # unicode -> str
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')

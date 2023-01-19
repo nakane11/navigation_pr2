@@ -12,12 +12,14 @@ class SpeakClient():
         self.pub = rospy.Publisher(self.topic_name, String, queue_size=1)
         self.ac = actionlib.SimpleActionClient('/speak_node/say', SpeakAction)
 
-    def say(self, text):
-        # str = String(data=text)
-        goal = SpeakGoal(data=text)
-        self.ac.send_goal(goal)
-        self.ac.wait_for_result()
-        # self.pub.publish(str)
+    def say(self, text, wait=True):
+        if wait:
+            goal = SpeakGoal(data=text)
+            self.ac.send_goal(goal)
+            self.ac.wait_for_result()
+        else:
+            str = String(data=text)
+            self.pub.publish(str)
 
     def parrot(self, text):
         script = "{}ですか？ よくわかりませんでした。".format(text)

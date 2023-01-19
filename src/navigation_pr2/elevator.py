@@ -250,6 +250,7 @@ class WaitforElevatorAvailable(smach.State):
             rospy.delete_param('~speech_raw')
             if re.search(r'.*到着.*$', speech_raw) is not None:
                 self.speak.say('私が乗り込むまでボタンを押しておいて下さい')
+                self.start = False
                 return 'succeeded'
             self.speak.parrot(speech_raw)
         return 'aborted'
@@ -302,6 +303,7 @@ class HoldDoor(smach.State):
         self.r.rarm.angle_vector(np.deg2rad([19.3756, -6.43574, -36.3081, -26.6661, -196.366, -45.457, 230.06]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
         self.ri.wait_interpolation()
+        rospy.sleep(4)
         # 乗り込んだらtuckarm
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')

@@ -18,7 +18,8 @@ from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 class NavigationSmach():
     def __init__(self):
         rospy.init_node('navigation_state_machine')
-        self.debug = rospy.get_param('~debug', False)
+        # self.debug = rospy.get_param('~debug', False)
+        self.debug = True
         self.last_speech_time = rospy.Time.now()
         self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
@@ -122,7 +123,7 @@ class NavigationSmach():
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted',
                                                         'move':'SEND_MOVE_TO'})
-                    smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(),
+                    smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(client=self.speak),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted',
                                                         'preempted':'aborted',

@@ -98,6 +98,7 @@ class WaitForTeaching(smach.State):
         if self.last_spot_name is not '':
             if re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw) is not None:
                 userdata.new_description = re.search(r'.*{}は(.*)$'.format(self.last_spot_name), speech_raw).group(1)
+                self.speak.say('そうなのですね')
                 return 'description received'
         if re.search(r'.*違い.*$', speech_raw) is not None:
             self.speak.say('失礼しました')
