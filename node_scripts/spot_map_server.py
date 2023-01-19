@@ -145,7 +145,7 @@ class SpotMapServer(object):
                 print(goal.name)
                 self.add_spot(pose, goal.name)
             elif goal.command == 2:
-                self.remove_spot(name)
+                self.remove_spot(goal.name)
             elif goal.command == 3:
                 print(goal.name)
                 self.add_spot(pose, goal.name)
