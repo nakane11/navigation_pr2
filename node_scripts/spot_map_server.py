@@ -184,19 +184,19 @@ class SpotMapServer(object):
         if len(start_node_candidates) > 0:
             start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
             start_node = start_node_candidates[0]
-
+        print('start:{}'.format(start_node))
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
             goal_graph = None
             goal_floor = None
-            print(type(goal))
-            print(type(list(graph.nodes)[0]))
+            print('=={}=='.format(name))
             for i in list(map(convert_string_to_bytes, list(graph.nodes))):
                 print(i)
             if goal in map(convert_string_to_bytes, list(graph.nodes)):
                 goal_graph_dict[name] = graph
                 goal_floor = name
                 goal_floor_array.append(goal_floor)
+        print('== current graph ==')
         for i in list(map(convert_string_to_bytes, list(self.active_graph.nodes))):
             print(i)
 
@@ -235,6 +235,7 @@ class SpotMapServer(object):
                             elevator_target = i
                             break
                     if not (elevator_source and elevator_target):
+                        rospy.loginfo('failed graph search')
                         result_array.append(2)
                         waypoints_length.append(0)
                         continue
@@ -254,6 +255,8 @@ class SpotMapServer(object):
                 waypoints_length.append(len(waypoints))
 
             except Exception as e:
+                for i in list(goal_graph.edges):
+                    print(i)
                 rospy.loginfo(e)
                 result_array.append(2)
                 waypoints_length.append(0)
@@ -267,7 +270,10 @@ class SpotMapServer(object):
 
     def node_to_msg(self, name, n):
         node_msg = Node()
-        node_msg.name = name
+        if n['name'] is True:
+            node_msg.name = name
+        else:
+            node_msg.name = 'no_name({})'.format(name)
         node_msg.floor = n['floor']
         node_msg.type = n['type']
         node_msg.pose = n['pose']
@@ -313,6 +319,31 @@ class SpotMapServer(object):
         return pose
 
     def add_spot(self, pose, name=None):
+        if not self.current_node:
+            if name is None:
+                node_name = str(self.label)
+                self.label += 1
+            else:
+                node_name = name
+            self.active_graph.add_node(node_name)
+            rospy.loginfo('Add node {}'.format(node_name))
+            self.active_graph.nodes[node_name]['type'] = 0
+            self.active_graph.nodes[node_name]['pose'] = pose
+            self.active_graph.nodes[node_name]['floor'] = self.active_graph_name
+            if name:
+                self.active_graph.nodes[node_name]['name'] = True
+            else:
+                self.active_graph.nodes[node_name]['name'] = False
+            self.current_node = node_name
+            for i in list(self.active_graph.nodes):
+                node_i = self.active_graph.nodes[i]
+                pose_i = node_i['pose']
+                diff = compute_difference_between_poses(pose, pose_i)
+                if diff < 0.4 and self.current_node != i:
+                    self.active_graph.add_edge(self.current_node, i)
+                    rospy.loginfo('Add edge {} to {}'.format(self.current_node, i))
+                    return
+
         # 一つ前のノードが自動記録されていて距離が近い場合に置き換え
         if self.current_node and name:
             prev_node = self.active_graph.nodes[self.current_node]
@@ -359,6 +390,8 @@ class SpotMapServer(object):
         self.active_graph.nodes[node_name]['floor'] = self.active_graph_name
         if name:
             self.active_graph.nodes[node_name]['name'] = True
+        else:
+            self.active_graph.nodes[node_name]['name'] = False
         if self.current_node:
             self.active_graph.add_edge(node_name, self.current_node)
             rospy.loginfo('Add edge {} to {}'.format(node_name, self.current_node))
@@ -367,9 +400,13 @@ class SpotMapServer(object):
 
     def remove_spot(self, name=None, graph_name=None):
         if not name:
-            self.active_graph.remove_node(self.current_node)
-            rospy.loginfo('Remove node {}'.format(self.current_node))
-            self.current_node = None
+            # self.active_graph.remove_node(self.current_node)
+            new_name = str(self.label)
+            self.label += 1
+            nx.relabel_nodes(self.active_graph, {self.current_node:new_name}, copy=False)
+            self.active_graph.nodes[new_name]['name'] = False
+            rospy.loginfo('Relabel node {} to {}'.format(self.current_node, new_name))
+            self.current_node = new_name
             return
         if graph_name:
             target_graph = self.graph_dict[graph_name]
