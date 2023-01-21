@@ -87,5 +87,10 @@
     </rosparam>
   </node>
 
+  <node name="human_counter"
+        pkg="navigation_pr2" type="human_counter.py"
+        output="screen"
+        clear_params="true" >
+  </node>
   
 </launch>

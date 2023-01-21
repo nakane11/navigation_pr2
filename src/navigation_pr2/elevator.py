@@ -13,6 +13,7 @@ from navigation_pr2.msg import RecordSpotAction, RecordSpotGoal
 from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from actionlib_msgs.msg import GoalStatus
+from std_msgs.msg import Bool
 
 class TeachRidingPosition(smach.State):
     def __init__(self, client, listener):
@@ -293,17 +294,33 @@ class MovetoInsidePosition(smach.State):
         return 'succeeded'
 
 class HoldDoor(smach.State):
-    def __init__(self, model, ri):
+    def __init__(self, model, ri, riding=True):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'])
         self.r = model
         self.ri = ri
+        self.riding = riding
 
     def execute(self, userdata):
         # 人が乗り込むまでドアを押さえておく
         self.r.rarm.angle_vector(np.deg2rad([19.3756, -6.43574, -36.3081, -26.6661, -196.366, -45.457, 230.06]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
+        self.r.head.angle_vector(np.deg2rad([-64.7933, 12.354]))
+        self.ri.angle_vector(self.r.angle_vector(), controller_type='head_controller')
         self.ri.wait_interpolation()
-        rospy.sleep(4)
+        rospy.loginfo('wait for people...')
+        if self.riding:
+            while True:
+                ret = rospy.wait_for_message('/human_counter/output', Bool)
+                print(ret)
+                if ret.data:
+                    break
+        else:
+            while True:
+                ret = rospy.wait_for_message('/human_counter/output', Bool)
+                print(ret)
+                if not ret.data:
+                    break
+        rospy.sleep(1)
         # 乗り込んだらtuckarm
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')

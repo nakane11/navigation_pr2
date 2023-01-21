@@ -152,12 +152,21 @@ class NavigationSmach():
                 smach.StateMachine.add('MOVE_TO_INSIDE_POSITION', MovetoInsidePosition(ri=self.ri),
                                        transitions={'succeeded':'HOLD_DOOR',
                                                     'aborted':'MOVE_TO_INSIDE_POSITION'})
-                smach.StateMachine.add('HOLD_DOOR', HoldDoor(model=self.r, ri=self.ri),
+                smach.StateMachine.add('HOLD_DOOR', HoldDoor(model=self.r, ri=self.ri, riding=True),
                                        transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_NAVIGATION',
                                                     'aborted':'aborted'})
                 smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_NAVIGATION', WaitforNextFloor(client=self.speak),
-                                       transitions={'succeeded':'succeeded',
+                                       transitions={'succeeded':'HOLD_DOOR_OFF',
                                                     'aborted':'aborted'})
+                smach.StateMachine.add('HOLD_DOOR_OFF', HoldDoor(model=self.r, ri=self.ri, riding=False),
+                                       transitions={'succeeded':'MOVE_TO_INSIDE_POSITION_OFF',
+                                                    'aborted':'aborted'})
+                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION_OFF', MovetoInsidePosition(ri=self.ri),
+                                       transitions={'succeeded':'MOVE_TO_RIDING_POSITION_OFF',
+                                                    'aborted':'MOVE_TO_INSIDE_POSITION_OFF'})
+                smach.StateMachine.add('MOVE_TO_RIDING_POSITION_OFF', MovetoRidingPosition(),
+                                       transitions={'succeeded':'succeeded',
+                                                    'aborted':'MOVE_TO_RIDING_POSITION_OFF'})
 
 
             smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
