@@ -9,6 +9,13 @@
 
   <!-- <include file="$(find navigation_utils)/launch/tf_transposer.launch" /> -->
 
+  <node name="ping" pkg="navigation_pr2" type="ping.py"
+        respawn="true" >
+    <param name="tries" value="1" />
+    <param name="timeout" value="2" />
+    <param name="host" value="8.8.8.8" />
+  </node>
+
   <group if="$(arg inside_pr2)" >
 
     <node name="spot_map_server"
