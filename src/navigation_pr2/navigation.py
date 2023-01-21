@@ -190,7 +190,7 @@ class GetSpeechinMoving(smach.State):
             if self.multiple_floor:
                 self.speak.say('地図を変えるので待って下さい')
                 goal = ChangeFloorGoal()
-                goal.command = 1
+                goal.command = 3
                 goal.floor = floor_name
                 self.ac.send_goal(goal)
                 rospy.loginfo('waiting for change_floor result...')
@@ -247,7 +247,7 @@ class ExecuteState(smach.State):
             if status != 'elevator':
                 userdata.status = 'elevator'
             else:
-                userdata.status = 'spot'
+                userdata.status = 'elevator off'
             return 'move'
 
         return 'succeeded'
@@ -265,6 +265,11 @@ class SendMoveTo(smach.State):
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.speak = client
+        self.use_hand = rospy.get_param('~use_hand', False)
+        if self.use_hand:
+            self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+            rospy.loginfo('waiting for start_hand_holding...')
+            self.hand_client.wait_for_server()
 
     def execute(self, userdata):
         if self.preempt_requested():
@@ -310,8 +315,28 @@ class SendMoveTo(smach.State):
                     continue
                 rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
                 self.speak.say('失敗しました')
-                return 'aborted'
+                # return 'aborted'
             rospy.loginfo("{}m to the next waypoint.".format(distance))
+        if userdata['status'] == 'elevator off':
+            self.speak.say('手を繋いで下さい')
+                # 手繋ぎ
+            if self.use_hand:
+                goal = StartHoldingGoal(command=0)
+                self.hand_client.send_goal(goal)
+                if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
+                    self.hand_client.cancel_all_goals()
+                    self.speak.say('中断しました')
+                    return 'timeout'
+                print(self.hand_client.get_result())
+            else:
+                rospy.loginfo('skipped hand holding')
+            if not self.debug:
+                ret = self.controller([], ['l_arm_controller'], None)
+                print(ret)
+            else:
+                rospy.loginfo('skipped switch controller')
+            self.speak.say('移動します')
+
         if userdata['status'] == 'elevator':
             if not self.debug:
                 ret = self.controller(['l_arm_controller'], [], None)
@@ -368,9 +393,9 @@ class StartNavigation(smach.State):
             self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
             rospy.loginfo('waiting for start_hand_holding...')
             self.hand_client.wait_for_server()
-            self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
-            rospy.loginfo('waiting for moving_wrist...')
-            self.wrist_client.wait_for_server()
+        self.wrist_client = actionlib.SimpleActionClient('moving_wrist', MoveWristAction)
+        rospy.loginfo('waiting for moving_wrist...')
+        self.wrist_client.wait_for_server()
         rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
@@ -381,13 +406,12 @@ class StartNavigation(smach.State):
         if self.debug:
             rospy.loginfo('skipped move_wrist')
         else:
-            if self.use_hand:
-                goal = MoveWristGoal()
-                self.wrist_client.send_goal(goal)
-                if not self.wrist_client.wait_for_result(timeout=rospy.Duration(40)):
-                    self.wrist_client.cancel_all_goals()
-                    self.speak.say('中断しました')
-                    return 'timeout'
+            goal = MoveWristGoal()
+            self.wrist_client.send_goal(goal)
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(120)):
+                self.wrist_client.cancel_all_goals()
+                self.speak.say('中断しました')
+                # return 'timeout'
         self.speak.say('手を繋いで下さい')
             # 手繋ぎ
         if self.use_hand:
@@ -396,7 +420,7 @@ class StartNavigation(smach.State):
             if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
                 self.hand_client.cancel_all_goals()
                 self.speak.say('中断しました')
-                return 'timeout'
+                # return 'timeout'
             print(self.hand_client.get_result())
         else:
             rospy.loginfo('skipped hand holding')

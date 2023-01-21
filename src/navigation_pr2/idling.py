@@ -50,7 +50,7 @@ class Idling(smach.State):
             if self.multiple_floor:
                 self.speak.say('地図を変えるので待って下さい')
                 goal = ChangeFloorGoal()
-                goal.command = 1
+                goal.command = 3
                 goal.floor = floor_name
                 self.ac.send_goal(goal)
                 rospy.loginfo('waiting for change_floor result...')
@@ -74,6 +74,7 @@ class Initialize(smach.State):
         self.dr.update_configuration({"acc_lim_x" : 2.0})
         self.dr.update_configuration({"acc_lim_y" : 2.0})        
         self.dr.update_configuration({"acc_lim_theta" : 2.2})
+        self.dr.update_configuration({"max_rot_vel" : 1.3})
         return 'succeeded'
 
 class Explain(smach.State):

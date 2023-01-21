@@ -19,7 +19,7 @@
   ;; (setq hand-height (elt (send hand-coords :pos) 2))
   ;; (setq torso-height (+ 50.0 (/ (- hand-height 812.755) 10)))
   ;; (send *pr2* :torso :angle-vector (float-vector torso-height))
-  (send *pr2* :torso :angle-vector #f(208.957))
+  ;; (send *pr2* :torso :angle-vector #f(208.957))
   
   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000)
   (send *ri* :wait-interpolation)
