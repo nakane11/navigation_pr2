@@ -77,7 +77,7 @@ class NavigationSmach():
             smach.StateMachine.add('TEACH_INSIDE_POSITION', TeachInsidePosition(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_TEACHING',
                                                 'aborted':'TEACH_INSIDE_POSITION'})
-            smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_TEACHING', WaitforNextFloor(client=self.speak),
+            smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_TEACHING', WaitforNextFloor(client=self.speak, mapping=True),
                                    transitions={'succeeded':'MOVE_TO_EXIT',
                                                 'aborted':'WAIT_FOR_NEXT_FLOOR_TEACHING'})
             smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
@@ -155,7 +155,7 @@ class NavigationSmach():
                 smach.StateMachine.add('HOLD_DOOR', HoldDoor(model=self.r, ri=self.ri, riding=True),
                                        transitions={'succeeded':'WAIT_FOR_NEXT_FLOOR_NAVIGATION',
                                                     'aborted':'aborted'})
-                smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_NAVIGATION', WaitforNextFloor(client=self.speak),
+                smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_NAVIGATION', WaitforNextFloor(client=self.speak, mapping=False),
                                        transitions={'succeeded':'HOLD_DOOR_OFF',
                                                     'aborted':'aborted'})
                 smach.StateMachine.add('HOLD_DOOR_OFF', HoldDoor(model=self.r, ri=self.ri, riding=False),

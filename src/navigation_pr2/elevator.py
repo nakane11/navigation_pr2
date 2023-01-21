@@ -114,12 +114,13 @@ class TeachInsidePosition(smach.State):
         return 'aborted'
         
 class WaitforNextFloor(smach.State):
-    def __init__(self, client):
+    def __init__(self, client, mapping=True):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
                              input_keys=['adjust_riding', 'riding_position'],
                              output_keys=['adjust_riding', 'riding_position'])
         self.multiple_floor = rospy.get_param('~multiple_floor', True)
         self.speak = client
+        self.mapping=mapping
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
@@ -149,7 +150,10 @@ class WaitforNextFloor(smach.State):
                 self.eus_floor(floor=floor_name)
                 if self.multiple_floor:
                     goal = ChangeFloorGoal()
-                    goal.command = 1
+                    if self.mapping:
+                        goal.command = 1
+                    else:
+                        goal.command = 3
                     goal.floor = floor_name
                     self.ac.send_goal(goal)
                     rospy.loginfo('waiting for change_floor result...')
@@ -304,9 +308,11 @@ class HoldDoor(smach.State):
         # 人が乗り込むまでドアを押さえておく
         self.r.rarm.angle_vector(np.deg2rad([19.3756, -6.43574, -36.3081, -26.6661, -196.366, -45.457, 230.06]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
+        self.ri.wait_interpolation()
         self.r.head.angle_vector(np.deg2rad([-64.7933, 12.354]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='head_controller')
         self.ri.wait_interpolation()
+        rospy.sleep(2)
         rospy.loginfo('wait for people...')
         if self.riding:
             while True:
@@ -320,7 +326,6 @@ class HoldDoor(smach.State):
                 print(ret)
                 if not ret.data:
                     break
-        rospy.sleep(1)
         # 乗り込んだらtuckarm
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
