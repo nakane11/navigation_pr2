@@ -338,6 +338,16 @@ class SendMoveTo(smach.State):
             self.speak.say('移動します')
 
         if userdata['status'] == 'elevator':
+            if self.use_hand:
+                goal = StartHoldingGoal(command=3)
+                self.hand_client.send_goal(goal)
+                if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
+                    self.hand_client.cancel_all_goals()
+                    self.speak.say('中断しました')
+                    return 'timeout'
+                print(self.hand_client.get_result())
+            else:
+                rospy.loginfo('skipped hand holding')
             if not self.debug:
                 ret = self.controller(['l_arm_controller'], [], None)
             return 'elevator'
@@ -408,7 +418,7 @@ class StartNavigation(smach.State):
         else:
             goal = MoveWristGoal()
             self.wrist_client.send_goal(goal)
-            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(120)):
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(60)):
                 self.wrist_client.cancel_all_goals()
                 self.speak.say('中断しました')
                 # return 'timeout'

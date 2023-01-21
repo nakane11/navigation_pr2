@@ -17,5 +17,12 @@
     <arg name="INPUT_CAMERA_INFO" value="$(arg INPUT_CAMERA_INFO)" />
     <arg name="with_depth" value="true" />
   </include>
+
+  <node name="ping" pkg="navigation_pr2" type="ping.py"
+        respawn="true" >
+    <param name="tries" value="1" />
+    <param name="timeout" value="2" />
+    <param name="host" value="8.8.8.8" />
+  </node>
   
 </launch>
