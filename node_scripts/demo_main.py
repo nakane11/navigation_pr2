@@ -18,7 +18,8 @@ from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 class NavigationSmach():
     def __init__(self):
         rospy.init_node('navigation_state_machine')
-        self.debug = rospy.get_param('~debug', False)
+        # self.debug = rospy.get_param('~debug', False)
+        self.debug = True
         self.last_speech_time = rospy.Time.now()
         self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
