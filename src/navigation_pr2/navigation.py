@@ -259,7 +259,7 @@ class SendMoveTo(smach.State):
                              input_keys=['next_point', 'waypoints', 'status'])
         self.debug = rospy.get_param('~debug', False)
         self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
-        self.max_retry = rospy.get_param("~max_retry", 8)
+        self.max_retry = rospy.get_param("~max_retry", 3)
         self.base_frame_id = rospy.get_param('~base_frame_id','base_footprint')
         self.goal_frame_id = rospy.get_param('~goal_frame_id','map')
         self.listener = tf.TransformListener()
@@ -314,7 +314,7 @@ class SendMoveTo(smach.State):
             if state == GoalStatus.ABORTED or state == GoalStatus.PREEMPTED:
                 rospy.logwarn('Move_base failed because server received cancel request or goal was aborted')
                 if retry_count < self.max_retry:
-                    rospy.logwarn('Retry send goals')
+                    rospy.logwarn('Retry send goals: {}'.format(retry_count))
                     ret = self.controller(['l_arm_controller'], [], None)
                     self.speak.say('手を離して下さい')
                     if self.use_hand:
@@ -323,8 +323,8 @@ class SendMoveTo(smach.State):
                     goal = SwitchGoal(switch=False)
                     self.ac.send_goal(goal)
                     self.ac.wait_for_result(timeout=rospy.Duration(40))
-                    rospy.sleep(5)
                     self.client.send_goal(goal_msg)
+                    rospy.sleep(0.5)
                     retry_count += 1
                     continue
                 rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
