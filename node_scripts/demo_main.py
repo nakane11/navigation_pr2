@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys
+import navigation_pr2.user_data
 from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
@@ -16,7 +18,9 @@ import smach_ros
 from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 
 class NavigationSmach():
-    def __init__(self):
+    def __init__(self, input_path=None, output_path=None):
+        self.input_path = input_path
+        self.output_path = output_path
         rospy.init_node('navigation_state_machine')
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
@@ -211,6 +215,9 @@ class NavigationSmach():
         ###################################
         print(2)
         sm = smach.StateMachine(outcomes=['succeeded', 'failed'])
+        if self.input_path is not None:
+            sm.load_user_data(self)
+        rospy.on_shutdown(sm.save_user_data)
         with sm:
             smach.StateMachine.add('INITIALIZE', Initialize(),
                                    transitions={'succeeded':'IDLING'})
@@ -254,7 +261,13 @@ class NavigationSmach():
         outcome = sm.execute()
 
 if __name__ == '__main__':
-    ns = NavigationSmach()
+    args = sys.argv
+    if len(args) == 2:
+        ns = NavigationSmach(input_path=args[1])
+        if len(args) >= 3:
+            ns = NavigationSmach(input_path=args[1], output_path=args[2])
+    else:
+        ns = NavigationSmach()
     ns.smach()
     rospy.spin()
     sis.stop()

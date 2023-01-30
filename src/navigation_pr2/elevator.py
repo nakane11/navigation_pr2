@@ -6,6 +6,8 @@ import smach
 import re
 import rospy
 from navigation_pr2.utils import *
+from navigation_pr2.encode_json import *
+from navigation_pr2.decode_json import *
 from virtual_force_drag.msg import SwitchAction, SwitchGoal
 from navigation_pr2.srv import ChangeFloor
 from navigation_pr2.msg import ChangeFloorAction, ChangeFloorGoal
@@ -33,7 +35,7 @@ class TeachRidingPosition(smach.State):
                 pos = get_robotpose(self.listener)
                 tmp = userdata.riding_position
                 floor_name = rospy.get_param('~floor')
-                tmp[floor_name] = pos
+                tmp[floor_name] = encode_pose(pos)
                 userdata.riding_position = tmp
                 print(tmp)
                 self.speak.say('はい')
@@ -78,7 +80,7 @@ class TeachInsidePosition(smach.State):
                 print('diff:{}'.format(diff))
                 floor_name = rospy.get_param('~floor')
                 tmp = userdata.adjust_riding
-                tmp[floor_name] = diff
+                tmp[floor_name] = list(diff)
                 userdata.adjust_riding = tmp
                 self.speak.say('はい')
                 self.start = False
@@ -269,8 +271,8 @@ class MovetoRidingPosition(smach.State):
     def execute(self, userdata):
         print(userdata.riding_position)
         floor_name = rospy.get_param('~floor')
-        elevator_pos = userdata.riding_position[floor_name]
-
+        elevator_pos_json = userdata.riding_position[floor_name]
+        elevator_pos = decode_json(elevator_pos_json)
         goal_msg = MoveBaseGoal()
         goal_msg.target_pose.header.frame_id = 'map'
         goal_msg.target_pose.pose = elevator_pos
