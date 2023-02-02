@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
+import argparse
 import navigation_pr2.user_data
 from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
@@ -18,10 +18,10 @@ import smach_ros
 from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 
 class NavigationSmach():
-    def __init__(self, input_path=None, output_path=None):
-        self.input_path = input_path
-        self.output_path = output_path
+    def __init__(self):
         rospy.init_node('navigation_state_machine')
+        self.input_path = rospy.get_param('~input', None)
+        self.output_path = rospy.get_param('~output', None)
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
         self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
@@ -215,9 +215,11 @@ class NavigationSmach():
         ###################################
         print(2)
         sm = smach.StateMachine(outcomes=['succeeded', 'failed'])
+        sm.set_path(input_file=self.input_path, output_file=self.output_path)
         if self.input_path is not None:
             sm.load_user_data(self)
-        rospy.on_shutdown(sm.save_user_data)
+        if self.output_path is not None:
+            rospy.on_shutdown(sm.save_user_data)
         with sm:
             smach.StateMachine.add('INITIALIZE', Initialize(),
                                    transitions={'succeeded':'IDLING'})
@@ -261,13 +263,7 @@ class NavigationSmach():
         outcome = sm.execute()
 
 if __name__ == '__main__':
-    args = sys.argv
-    if len(args) == 2:
-        ns = NavigationSmach(input_path=args[1])
-        if len(args) >= 3:
-            ns = NavigationSmach(input_path=args[1], output_path=args[2])
-    else:
-        ns = NavigationSmach()
+    ns = NavigationSmach()
     ns.smach()
     rospy.spin()
     sis.stop()
