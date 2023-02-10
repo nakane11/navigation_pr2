@@ -217,7 +217,7 @@ class NavigationSmach():
         sm = smach.StateMachine(outcomes=['succeeded', 'failed'])
         sm.set_path(input_file=self.input_path, output_file=self.output_path)
         if self.input_path is not None:
-            sm.load_user_data(self)
+            sm.load_user_data()
         if self.output_path is not None:
             rospy.on_shutdown(sm.save_user_data)
         with sm:

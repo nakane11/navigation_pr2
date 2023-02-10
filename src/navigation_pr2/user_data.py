@@ -19,8 +19,9 @@ def load_user_data(self):
 
 def save_user_data(self):
     with open(self.output_file, 'w') as f:
-        json.dump(self.userdata, f, indent=4)
+        json.dump(self.userdata._data, f, indent=4)
 
+smach.StateMachine.set_path = set_path
 smach.StateMachine.load_user_data = load_user_data
 smach.StateMachine.save_user_data = save_user_data
         
