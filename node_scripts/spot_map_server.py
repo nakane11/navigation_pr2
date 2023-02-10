@@ -4,6 +4,8 @@
 import struct
 import threading
 import networkx as nx
+import jsonpickle
+from networkx.readwrite import json_graph
 import rospy
 import tf
 import actionlib
@@ -24,6 +26,24 @@ def convert_string_to_bytes(string):
     for i in string:
         bytes += struct.pack("B", ord(i))
     return bytes
+
+def serialize(call_graph, file_path):
+    if not isinstance(call_graph, nx.MultiGraph):
+        raise Exception('call_graph has be an instance of networkx.DiGraph')
+
+    with open(file_path, 'w+') as _file:
+        _file.write(jsonpickle.encode(
+            json_graph.adjacency_data(call_graph))
+        )
+
+def deserialize(file_path):
+    call_graph = None
+    with open(file_path, 'r+') as _file:
+        call_graph = json_graph.adjacency_graph(
+            jsonpickle.decode(_file.read()),
+            directed=False, multigraph=True
+        )
+    return call_graph
 
 class SpotMapServer(object):
     def __init__(self, lock):
