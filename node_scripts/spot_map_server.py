@@ -5,6 +5,7 @@ import struct
 import threading
 import networkx as nx
 import jsonpickle
+import json
 from networkx.readwrite import json_graph
 import rospy
 import tf
@@ -27,28 +28,28 @@ def convert_string_to_bytes(string):
         bytes += struct.pack("B", ord(i))
     return bytes
 
-def serialize(call_graph, file_path):
+def serialize(call_graph):
     if not isinstance(call_graph, nx.MultiGraph):
         raise Exception('call_graph has be an instance of networkx.DiGraph')
+    return jsonpickle.encode(json_graph.adjacency_data(call_graph))
 
-    with open(file_path, 'w+') as _file:
-        _file.write(jsonpickle.encode(
-            json_graph.adjacency_data(call_graph))
-        )
-
-def deserialize(file_path):
-    call_graph = None
-    with open(file_path, 'r+') as _file:
-        call_graph = json_graph.adjacency_graph(
-            jsonpickle.decode(_file.read()),
-            directed=False, multigraph=True
-        )
-    return call_graph
+def deserialize(call_json):
+    graph = json_graph.adjacency_graph(jsonpickle.decode(call_json),
+                                       directed=False, multigraph=True)
+    return graph
 
 class SpotMapServer(object):
     def __init__(self, lock):
         self.lock = lock
         self.graph_dict = {}
+
+        self.input_data = rospy.get_param('~input_data', '')
+        if self.input_data != '':
+            self.import_json()
+        self.output_data = rospy.get_param('~output_data', '')
+        if self.output_data != '':
+            rospy.on_shutdown(self.export_json)
+
         self.label = 1
         self.current_node = None
         self.auto_map_enabled = False
@@ -71,6 +72,23 @@ class SpotMapServer(object):
         self.thread.daemon = True  # terminate when main thread exit
         self.thread.start()
         rospy.loginfo('initialized')
+
+    def import_json(self):
+        with open(self.input_data, 'r') as f:
+            json_load = json.load(f)
+        for key in json_load.keys():
+            graph_data = deserialize(json_load[key])
+            self.graph_dict[key] = graph_data
+
+    def export_json(self):
+        json_data = {}
+        for name, graph in self.graph_dict.items():
+            if name == self.active_graph_name:
+                continue
+            json_data[name] = serialize(graph)
+        json_data[self.active_graph_name] = serialize(self.active_graph)
+        with open(self.output_data, 'w+') as f:
+            json.dump(json_data, f, indent=4)
 
     def _loop(self):
         rate = rospy.Rate(10)

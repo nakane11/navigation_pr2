@@ -15,6 +15,9 @@
           pkg="navigation_pr2_nx" type="spot_map_server.py"
           output="screen"
           clear_params="true" >
+      <rosparam subst_value="true">
+        output_data: "/tmp/map.json"
+      </rosparam>
     </node>
 
     <node name="republish_marker_array"
@@ -33,6 +36,9 @@
           pkg="navigation_pr2" type="spot_map_server.py"
           output="screen"
           clear_params="true" >
+      <rosparam subst_value="true">
+	output_data: "/tmp/map.json"
+      </rosparam>
     </node>
 
     <node name="republish_marker_array"
