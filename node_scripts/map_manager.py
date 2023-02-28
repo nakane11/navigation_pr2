@@ -93,8 +93,10 @@ class RobotService(object):
 class MapManager(object):
     
     def __init__(self):
-        self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        os.mkdir(self.dir_path)
+        # self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        self.dir_path = '/tmp/raw_maps'
+        if not os.path.exists(self.dir_path):
+            os.mkdir(self.dir_path)
         self.rs = RobotService()
         self.procs = {}
         self.current_floor = None
