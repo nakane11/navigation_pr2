@@ -66,15 +66,22 @@ class Initialize(smach.State):
         smach.State.__init__(self, outcomes=['succeeded'],
                              output_keys=['riding_position', 'adjust_riding'])
         rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=40.0)
+        self.dr = False
+        try:
+            self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=10.0)
+        except:
+            pass
+        if not self.dr:
+            rospy.loginfo('failed waiting for move_base_node/DWAPlannerROS...')            
 
     def execute(self, userdata):
         userdata.riding_position = {}
         userdata.adjust_riding = {}
-        self.dr.update_configuration({"acc_lim_x" : 2.0})
-        self.dr.update_configuration({"acc_lim_y" : 2.0})        
-        self.dr.update_configuration({"acc_lim_theta" : 2.2})
-        self.dr.update_configuration({"max_rot_vel" : 1.3})
+        if self.dr:
+            self.dr.update_configuration({"acc_lim_x" : 2.0})
+            self.dr.update_configuration({"acc_lim_y" : 2.0})
+            self.dr.update_configuration({"acc_lim_theta" : 2.2})
+            self.dr.update_configuration({"max_rot_vel" : 1.3})
         return 'succeeded'
 
 class Explain(smach.State):
@@ -107,12 +114,18 @@ class Shutdown(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
         rospy.loginfo('waiting for move_base_node/DWAPlannerROS...')
-        self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=40.0)
-
+        self.dr = False
+        try:
+            self.dr = dynamic_reconfigure.client.Client('/move_base_node/DWAPlannerROS', timeout=10.0)
+        except:
+            pass
+        if not self.dr:
+            rospy.loginfo('failed waiting for move_base_node/DWAPlannerROS...')
     def execute(self, userdata):
-        self.dr.update_configuration({"acc_lim_x" : 2.5})
-        self.dr.update_configuration({"acc_lim_y" : 2.5})        
-        self.dr.update_configuration({"acc_lim_theta" : 5.0})
+        if self.dr:
+            self.dr.update_configuration({"acc_lim_x" : 2.5})
+            self.dr.update_configuration({"acc_lim_y" : 2.5})
+            self.dr.update_configuration({"acc_lim_theta" : 5.0})
         return 'succeeded'
 
 class ListSpots(smach.State):
