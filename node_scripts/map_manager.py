@@ -97,6 +97,7 @@ class MapManager(object):
         self.dir_path = '/tmp/raw_maps'
         if not os.path.exists(self.dir_path):
             os.mkdir(self.dir_path)
+        self.scan_topic = rospy.get_param('~scan_topic', '/base_scan_filtered/scan')
         self.rs = RobotService()
         self.procs = {}
         self.current_floor = None
@@ -150,7 +151,7 @@ class MapManager(object):
         self.stop_tf_publisher()
         self.start_tf_publisher(floor)
         # self.start_multirobot_map_merge(floor, trans, rot)
-        # self.set_initialpose(trans, rot)
+        self.publish_initialpose(trans, rot)
         self.start_gmapping(floor)
         self.set_current_floor(floor)
 
@@ -180,7 +181,7 @@ class MapManager(object):
         # self.stop_multirobot_map_merge(self.current_floor)
         self.start_map_server(floor)
         # self.start_multirobot_map_merge(floor, trans, rot)
-        # self.set_initialpose(trans, rot)
+        self.publish_initialpose(trans, rot)
         self.set_current_floor(floor)
 
     # initialpose
@@ -221,8 +222,8 @@ class MapManager(object):
         executable = 'slam_gmapping'
         name = 'slam_gmapping_{}'.format(floor)
         args=['_odom_frame:=odom_combined', '_map_frame:=/map',
-              '_xmin:=-30.0', '_ymin:=-30.0', '_xmax:=30.0', '_ymax:=30.0']
-        remap_args = {'scan':'base_scan_filtered_mux/scan'}
+              '_xmin:=-50.0', '_ymin:=-50.0', '_xmax:=50.0', '_ymax:=50.0']
+        remap_args = {'scan':'{}'.format(self.scan_topic)}
         gmapping = self.rs.launch_node(package, executable, name, args=args, remap=remap_args)
         self.procs['gmapping'] = gmapping
 
