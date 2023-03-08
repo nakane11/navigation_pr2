@@ -24,7 +24,8 @@ class NavigationSmach():
         self.output_path = rospy.get_param('~output', None)
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
-        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        # self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/google', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         self.r = skrobot.models.PR2()
@@ -33,7 +34,7 @@ class NavigationSmach():
     def speech_cb(self, msg):
         if msg.candidates.confidence < 0.3:
             return
-        if msg.header.stamp - self.last_speech_time > rospy.Duration(0) or self.debug:
+        if msg.header.stamp - self.last_speech_time > rospy.Duration(0) or True:
             rospy.set_param('~speech_raw', msg.candidates.transcript[0].replace(' ', ''))
             self.last_speech_time = msg.header.stamp
 
@@ -151,7 +152,12 @@ class NavigationSmach():
                                                     'aborted':'WAIT_FOR_ELEVATOR_AVAILABLE'})
                 smach.StateMachine.add('MOVE_TO_RIDING_POSITION', MovetoRidingPosition(),
                                        transitions={'succeeded':'MOVE_TO_INSIDE_POSITION',
-                                                    'aborted':'MOVE_TO_RIDING_POSITION'})
+                                                    'retry':'MOVE_TO_RIDING_POSITION',
+                                                    'aborted':'MOVE_TO_RIDING_POSITION_FAILED'})
+                smach.StateMachine.add('MOVE_TO_RIDING_POSITION_FAILED', MovetoRidingPositionFailed(client=self.speak),
+                                       transitions={'succeeded':'MOVE_TO_INSIDE_POSITION',
+                                                    'aborted':'MOVE_TO_RIDING_POSITION_FAILED',
+                                                    'retry': 'MOVE_TO_RIDING_POSITION'})
                 smach.StateMachine.add('MOVE_TO_INSIDE_POSITION', MovetoInsidePosition(ri=self.ri),
                                        transitions={'succeeded':'HOLD_DOOR',
                                                     'aborted':'MOVE_TO_INSIDE_POSITION'})
@@ -169,7 +175,8 @@ class NavigationSmach():
                                                     'aborted':'MOVE_TO_INSIDE_POSITION_OFF'})
                 smach.StateMachine.add('MOVE_TO_RIDING_POSITION_OFF', MovetoRidingPosition(),
                                        transitions={'succeeded':'succeeded',
-                                                    'aborted':'MOVE_TO_RIDING_POSITION_OFF'})
+                                                    'retry':'MOVE_TO_RIDING_POSITION_OFF',
+                                                    'aborted':'aborted'})
 
 
             smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
@@ -261,9 +268,9 @@ class NavigationSmach():
         sis = smach_ros.IntrospectionServer('server_name', sm, '/SM_ROOT')
         sis.start()
         outcome = sm.execute()
+        sis.stop()
 
 if __name__ == '__main__':
     ns = NavigationSmach()
     ns.smach()
     rospy.spin()
-    sis.stop()

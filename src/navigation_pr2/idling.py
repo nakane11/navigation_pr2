@@ -77,7 +77,7 @@ class Initialize(smach.State):
     def execute(self, userdata):
         userdata.riding_position = {}
         userdata.adjust_riding = {}
-        if self.dr:
+        if self.dr is not False:
             self.dr.update_configuration({"acc_lim_x" : 2.0})
             self.dr.update_configuration({"acc_lim_y" : 2.0})
             self.dr.update_configuration({"acc_lim_theta" : 2.2})
