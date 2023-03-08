@@ -5,6 +5,7 @@ import actionlib
 import smach
 import re
 import rospy
+import dynamic_reconfigure.client
 from navigation_pr2.utils import *
 from navigation_pr2.encode_json import *
 from navigation_pr2.decode_json import *
@@ -264,15 +265,21 @@ class WaitforElevatorAvailable(smach.State):
 
 class MovetoRidingPosition(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'retry'],
                              input_keys=['riding_position'])
+        self.count = 0
+        self.max_retry = 6
         self.mb = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.dr = dynamic_reconfigure.client.Client('/move_base_node/global_costmap/static_layer', timeout=10.0)
 
     def execute(self, userdata):
+        if self.count == 0:
+            self.dr.update_configuration({"enabled" : False})
+            rospy.sleep(3)
         print(userdata.riding_position)
         floor_name = rospy.get_param('~floor')
         elevator_pos_json = userdata.riding_position[floor_name]
-        elevator_pos = decode_json(elevator_pos_json)
+        elevator_pos = decode_pose(elevator_pos_json)
         goal_msg = MoveBaseGoal()
         goal_msg.target_pose.header.frame_id = 'map'
         goal_msg.target_pose.pose = elevator_pos
@@ -283,8 +290,38 @@ class MovetoRidingPosition(smach.State):
         state = self.mb.get_state()
         if state == GoalStatus.ABORTED or state == GoalStatus.PREEMPTED:
             rospy.logwarn('Move_base failed because server received cancel request or goal was aborted')
-            return 'aborted'
+            if self.count < self.max_retry:
+                self.count += 1
+                return 'retry'
+            else:
+                self.count = 0
+                self.dr.update_configuration({"enabled" : True})
+                return 'aborted'
+        self.count = 0
+        self.dr.update_configuration({"enabled" : True})
         return 'succeeded'
+
+class MovetoRidingPositionFailed(smach.State):
+    def __init__(self, client):
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'retry'])
+        self.speak = client
+        self.retry = 0
+
+    def execute(self, userdata):
+        if self.retry < 3:
+            self.retry += 1
+            return 'retry'
+        self.speak.say('失敗しました。私をエレベータにのせてください')
+        rospy.loginfo('waiting ...')
+        if wait_for_speech(timeout=300):
+            speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
+            rospy.delete_param('~speech_raw')
+            if re.search(r'.*た.*$', speech_raw) is not None:
+                self.speak.say('ありがとうございます')
+                self.retry = 0
+                return 'succeeded'
+        self.speak.parrot(speech_raw)
+        return 'aborted'
 
 class MovetoInsidePosition(smach.State):
     def __init__(self, ri):
@@ -316,19 +353,21 @@ class HoldDoor(smach.State):
         self.ri.wait_interpolation()
         rospy.sleep(2)
         rospy.loginfo('wait for people...')
+        start_time = rospy.Time.now()
         if self.riding:
-            while True:
-                ret = rospy.wait_for_message('/human_counter/output', Bool)
+            while True :
+                ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
                 print(ret)
-                if ret.data:
+                if ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
                     break
         else:
             while True:
-                ret = rospy.wait_for_message('/human_counter/output', Bool)
+                ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
                 print(ret)
-                if not ret.data:
+                if not ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
                     break
         # 乗り込んだらtuckarm
+        rospy.sleep(5)
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
         self.ri.wait_interpolation()
