@@ -103,21 +103,6 @@ class GetWaypoints(smach.State):
             userdata.path_candidates = path_known
             return 'multiple goals'
             
-        # if res.result == 0:
-        #     userdata.waypoints = res.waypoints
-        #     floor = rospy.get_param('~floor')
-        #     if res.goal_floor != floor:
-        #         goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-        #         self.speak.say('{}は{}階にあります。'.format(goal_name.encode('utf-8'), goal_floor))
-        #     userdata.next_point = -1
-        #     return 'ready to move'
-        # elif res.result == 1:
-        #     self.speak.say('すみません。どこにあるかわかりません。')
-        # elif res.result == 2:
-        #     goal_floor = [k for k, v in floors.items() if v == res.goal_floor][0]
-        #     self.speak.say('すみません。{}は{}階にありますがエレベータの場所を知らないので案内できません。'.format(goal_name.encode('utf-8'), goal_floor))
-        # return 'no path found'
-
 class SuggestGoals(smach.State):
     def __init__(self, client):
         smach.State.__init__(self, outcomes=['ready to move', 'rejected', 'rejected all'],
@@ -166,9 +151,6 @@ class GetSpeechinMoving(smach.State):
         rospy.wait_for_service('/spot_map_server/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         if self.multiple_floor:
-            # rospy.loginfo('waiting for map_manager/change_floor...')
-            # rospy.wait_for_service('/map_manager/change_floor')
-            # self.py_floor = rospy.ServiceProxy('/map_manager/change_floor', ChangeFloor)
             self.ac = actionlib.SimpleActionClient('map_manager/change_floor', ChangeFloorAction)
             rospy.loginfo('waiting for map_manager/change_floor...')
             self.ac.wait_for_server()
@@ -260,6 +242,7 @@ class SendMoveTo(smach.State):
         self.debug = rospy.get_param('~debug', False)
         self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
         self.max_retry = rospy.get_param("~max_retry", 3)
+        self.max_retry_without_hand = rospy.get_param("~max_retry_without_hand", 3)
         self.base_frame_id = rospy.get_param('~base_frame_id','base_footprint')
         self.goal_frame_id = rospy.get_param('~goal_frame_id','map')
         self.listener = tf.TransformListener()
@@ -314,6 +297,12 @@ class SendMoveTo(smach.State):
             if state == GoalStatus.ABORTED or state == GoalStatus.PREEMPTED:
                 rospy.logwarn('Move_base failed because server received cancel request or goal was aborted')
                 if retry_count < self.max_retry:
+                    rospy.logwarn('Retry send goals: {}'.format(retry_count))
+                    self.client.send_goal(goal_msg)
+                    rospy.sleep(0.5)
+                    retry_count += 1
+                    continue
+                elif retry_count < self.max_retry + self.max_retry_without_hand:
                     rospy.logwarn('Retry send goals: {}'.format(retry_count))
                     ret = self.controller(['l_arm_controller'], [], None)
                     self.speak.say('手を離して下さい')
@@ -432,7 +421,7 @@ class StartNavigation(smach.State):
         else:
             goal = MoveWristGoal()
             self.wrist_client.send_goal(goal)
-            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(60)):
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(10)):
                 self.wrist_client.cancel_all_goals()
                 self.speak.say('中断しました')
                 # return 'timeout'
