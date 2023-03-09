@@ -101,6 +101,7 @@ class MapManager(object):
         self.rs = RobotService()
         self.procs = {}
         self.current_floor = None
+        self.frame_dict = {}
         rospy.on_shutdown(self.handler)
         self.listener = tf.TransformListener()
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
@@ -130,9 +131,13 @@ class MapManager(object):
         rospy.set_param('/current_floor', floor)
 
     def start_make_map(self, floor):
+        print("=======================================")
         self.stop_map_server()
-        # self.stop_multirobot_map_merge(self.current_floor)
         self.stop_amcl()
+        print("=======================================")
+        a = ([0,0,0],[0,0,0,1])
+        self.frame_dict[floor] = a
+        print("=======================================")
         self.start_tf_publisher(floor)
         self.start_gmapping(floor)
         self.set_current_floor(floor)
@@ -145,49 +150,37 @@ class MapManager(object):
         a = None
         while a is None:
             a = self.get_robotpose()
-        trans, rot = a
-        # self.stop_multirobot_map_merge(self.current_floor)
+        self.frame_dict[floor] = a
         self.stop_gmapping()
         self.stop_tf_publisher()
         self.start_tf_publisher(floor)
-        # self.start_multirobot_map_merge(floor, trans, rot)
-        self.publish_initialpose(trans, rot)
+        rospy.sleep(10)
         self.start_gmapping(floor)
         self.set_current_floor(floor)
 
     def stop_make_map(self):
-        a = None
-        while a is None:
-            a = self.get_robotpose()
-        trans, rot = a
         filepath = self.start_map_saver(self.current_floor) + '.yaml'
         while not os.path.exists(filepath):
             continue
         rospy.loginfo('Successfully saved {}!'.format(filepath))
-        # self.stop_multirobot_map_merge(self.current_floor)
         self.stop_gmapping()
-        # self.start_multirobot_map_merge(self.current_floor, trans, rot)
         self.start_map_server(self.current_floor)
         self.start_amcl()
         time.sleep(15)
-        self.publish_initialpose(trans, rot)
+        self.publish_initialpose([0,0,0], [0,0,0,1])
 
     def change_floor(self, floor):
-        a = None
-        while a is None:
-            a = self.get_robotpose()
-        trans, rot = a
         self.stop_map_server()
-        # self.stop_multirobot_map_merge(self.current_floor)
+        self.stop_tf_publisher()
+        self.start_tf_publisher(floor)
         self.start_map_server(floor)
-        # self.start_multirobot_map_merge(floor, trans, rot)
-        self.publish_initialpose(trans, rot)
+        self.publish_initialpose([0,0,0], [0,0,0,1])
         self.set_current_floor(floor)
 
     # initialpose
     def get_robotpose(self):
         try:
-            (trans,rot) = self.listener.lookupTransform('/map', '/base_link', rospy.Time(0))
+            (trans,rot) = self.listener.lookupTransform('/world', '/base_laser_link', rospy.Time(0))
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
         return trans, rot
@@ -208,13 +201,6 @@ class MapManager(object):
         msg.pose.covariance[6 * 5 + 5] = math.pi/12.0 *  math.pi/12.0
         print(msg)
         self.initialpose.publish(msg)
-
-    # def set_initialpose_param(self, ns, trans, rot):
-    #     euler = tf.transformations.euler_from_quaternion(rot)
-    #     rospy.set_param('{}/map_merge/init_pose_x'.format(ns), trans[0])
-    #     rospy.set_param('{}/map_merge/init_pose_y'.format(ns), trans[1])
-    #     rospy.set_param('{}/map_merge/init_pose_z'.format(ns), trans[2])
-    #     rospy.set_param('{}/map_merge/init_pose_yaw'.format(ns), euler[2])
 
     # make /map of /map frame
     def start_gmapping(self, floor):
@@ -297,9 +283,10 @@ class MapManager(object):
     def start_tf_publisher(self, floor):
         package = 'tf'
         executable = 'static_transform_publisher'
-
         name_from_world = "world_to_{}".format(floor)
-        args_from_world= ["0.000", "0.000", "0.000", "0", "0", "0", "/world", "/{}".format(floor), "100"]
+        trans, rot = self.frame_dict[floor]
+        e = tf.transformations.euler_from_quaternion(rot)
+        args_from_world= ["{}".format(trans[0]), "{}".format(trans[1]), "0.000", "0", "0", "0".format(e[2]), "/world", "/{}".format(floor), "100"]
         tf_from_world = self.rs.launch_node(package, executable, name_from_world, args=args_from_world)
         self.procs['tf_from_world'] = tf_from_world
         
