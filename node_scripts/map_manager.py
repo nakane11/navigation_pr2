@@ -19,6 +19,7 @@ import math
 import tf
 import actionlib
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from std_srvs.srv import Empty
 from navigation_pr2.srv import *
 from navigation_pr2.msg import ChangeFloorAction, ChangeFloorResult
 
@@ -102,11 +103,13 @@ class MapManager(object):
         self.procs = {}
         self.current_floor = None
         self.frame_dict = {}
+        self.initialpose_dict = {}
         rospy.on_shutdown(self.handler)
         self.listener = tf.TransformListener()
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
-        # rospy.Service('~change_floor', ChangeFloor, self.floor_cb)
         self.ac = actionlib.SimpleActionServer('~change_floor', ChangeFloorAction, self.floor_cb)
+        rospy.wait_for_service('/move_base/clear_costmaps')        
+        self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
 
     def handler(self):
         try:
@@ -116,6 +119,7 @@ class MapManager(object):
             pass
 
     def floor_cb(self, goal):
+        print(10)
         if goal.command == 0:
             self.start_make_map(goal.floor)
         elif goal.command == 1:
@@ -125,24 +129,43 @@ class MapManager(object):
         elif goal.command == 3:
             self.change_floor(goal.floor)
         self.ac.set_succeeded(ChangeFloorResult())
+        print(20)
 
     def set_current_floor(self, floor):
         self.current_floor = floor
         rospy.set_param('/current_floor', floor)
 
     def start_make_map(self, floor):
-        print("=======================================")
+        self.start_map_tf_publisher()
         self.stop_map_server()
         self.stop_amcl()
-        print("=======================================")
-        a = ([0,0,0],[0,0,0,1])
-        self.frame_dict[floor] = a
-        print("=======================================")
-        self.start_tf_publisher(floor)
         self.start_gmapping(floor)
+        a = None
+        while a is None:
+            a = self.get_robotpose()
+        self.initialpose_dict[floor] = a
+        print(a)
         self.set_current_floor(floor)
+        self.clear_costmaps()
 
     def change_make_map(self, floor):
+        filepath = self.start_map_saver(self.current_floor) + '.yaml'
+        while not os.path.exists(filepath):
+            continue
+        rospy.loginfo('Successfully saved {}!'.format(filepath))
+        self.stop_gmapping()
+        # self.stop_tf_publisher()
+        # self.start_tf_publisher(floor)
+        self.start_gmapping(floor)
+        a = None
+        while a is None:
+            a = self.get_robotpose()
+        print(a)
+        self.initialpose_dict[floor] = a
+        self.set_current_floor(floor)
+        self.clear_costmaps()
+
+    def stop_make_map(self):
         filepath = self.start_map_saver(self.current_floor) + '.yaml'
         while not os.path.exists(filepath):
             continue
@@ -150,37 +173,28 @@ class MapManager(object):
         a = None
         while a is None:
             a = self.get_robotpose()
-        self.frame_dict[floor] = a
-        self.stop_gmapping()
-        self.stop_tf_publisher()
-        self.start_tf_publisher(floor)
-        rospy.sleep(10)
-        self.start_gmapping(floor)
-        self.set_current_floor(floor)
-
-    def stop_make_map(self):
-        filepath = self.start_map_saver(self.current_floor) + '.yaml'
-        while not os.path.exists(filepath):
-            continue
-        rospy.loginfo('Successfully saved {}!'.format(filepath))
+        print(a)
         self.stop_gmapping()
         self.start_map_server(self.current_floor)
         self.start_amcl()
         time.sleep(15)
-        self.publish_initialpose([0,0,0], [0,0,0,1])
+        self.publish_initialpose(a[0], a[1])
+        self.clear_costmaps()
 
     def change_floor(self, floor):
         self.stop_map_server()
-        self.stop_tf_publisher()
-        self.start_tf_publisher(floor)
+        # self.stop_tf_publisher()
+        # self.start_tf_publisher(floor)
         self.start_map_server(floor)
-        self.publish_initialpose([0,0,0], [0,0,0,1])
+        a = self.initialpose_dict[floor]
+        self.publish_initialpose(a[0], a[1])
+        self.clear_costmaps()
         self.set_current_floor(floor)
 
     # initialpose
     def get_robotpose(self):
         try:
-            (trans,rot) = self.listener.lookupTransform('/world', '/base_laser_link', rospy.Time(0))
+            (trans,rot) = self.listener.lookupTransform('/world', '/base_link', rospy.Time(0))
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
         return trans, rot
@@ -246,60 +260,35 @@ class MapManager(object):
         if 'server' in self.procs:
             self.rs.term_node(self.procs['server'])
 
-    # def start_multirobot_map_merge(self, floor, trans, rot):
-    #     print(floor)
-    #     package = 'multirobot_map_merge'
-    #     executable = 'map_merge'
-    #     name = 'map_merge_{}'.format(floor)
-    #     args=['_merged_map_topic:=/map', '_known_init_poses:=true', '_world_frame:=map']
-    #     multirobot_map_merge = self.rs.launch_node(package, executable, name, args=args)
-    #     self.procs['multirobot_map_merge'] = multirobot_map_merge
-    #     for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
-    #         fname = os.path.basename(os.path.splitext(yaml)[0])
-    #         self.start_child_map_server(floor, fname, trans, rot)
-
-    # def stop_multirobot_map_merge(self, floor):
-    #     if 'multirobot_map_merge' in self.procs:
-    #         self.rs.term_node(self.procs['multirobot_map_merge'])
-    #     for yaml in glob.glob('{}/{}_*.yaml'.format(self.dir_path, floor)):
-    #         fname = os.path.splitext(yaml)[0]
-
-    #         self.stop_child_map_server(fname)
-
-    # def start_child_map_server(self, floor, fname, trans, rot):
-    #     self.set_initialpose_param('/{}/{}'.format(floor, fname), trans, rot)
-    #     package = 'map_server'
-    #     executable = 'map_server'
-    #     name = 'map_server_{}'.format(fname)
-    #     args=['{}/{}.yaml'.format(self.dir_path, fname), 'map:=/{}/{}/map'.format(floor, fname)]
-    #     server = self.rs.launch_node(package, executable, name, args=args)
-    #     self.procs['{}'.format(fname)] = server
-
-    # def stop_child_map_server(self, fname):
-    #     if fname in self.procs:
-    #         self.rs.term_node(self.procs[fname])
-
     # publish /world->/6f and /6f->/map tf
-    def start_tf_publisher(self, floor):
+    # def start_tf_publisher(self, floor):
+    #     package = 'tf'
+    #     executable = 'static_transform_publisher'
+    #     name_from_world = "world_to_{}".format(floor)
+    #     trans, rot = self.frame_dict[floor]
+    #     e = tf.transformations.euler_from_quaternion(rot)
+    #     args_from_world= ["{}".format(trans[0]), "{}".format(trans[1]), "0.000", "0", "0", "0".format(e[2]), "/world", "/{}".format(floor), "100"]
+    #     tf_from_world = self.rs.launch_node(package, executable, name_from_world, args=args_from_world)
+    #     self.procs['tf_from_world'] = tf_from_world
+        
+    #     name_to_map = "floor_{}_to_map".format(floor)
+    #     args_to_map= ["0.000", "0.000", "0.000", "0", "0", "0", "/{}".format(floor), "/map", "100"]
+    #     tf_to_map = self.rs.launch_node(package, executable, name_to_map, args=args_to_map)
+    #     self.procs['tf_to_map'] = tf_to_map
+
+    # def stop_tf_publisher(self):
+    #     if 'tf_from_world' in self.procs:
+    #         self.rs.term_node(self.procs['tf_from_world'])
+    #     if 'tf_to_map' in self.procs:
+    #         self.rs.term_node(self.procs['tf_to_map'])
+
+    def start_map_tf_publisher(self):
         package = 'tf'
         executable = 'static_transform_publisher'
-        name_from_world = "world_to_{}".format(floor)
-        trans, rot = self.frame_dict[floor]
-        e = tf.transformations.euler_from_quaternion(rot)
-        args_from_world= ["{}".format(trans[0]), "{}".format(trans[1]), "0.000", "0", "0", "0".format(e[2]), "/world", "/{}".format(floor), "100"]
+        name_from_world = "world_to_map"
+        args_from_world= ["0.0", "0.0", "0.000", "0", "0", "0", "/world", "/map", "100"]
         tf_from_world = self.rs.launch_node(package, executable, name_from_world, args=args_from_world)
         self.procs['tf_from_world'] = tf_from_world
-        
-        name_to_map = "floor_{}_to_map".format(floor)
-        args_to_map= ["0.000", "0.000", "0.000", "0", "0", "0", "/{}".format(floor), "/map", "100"]
-        tf_to_map = self.rs.launch_node(package, executable, name_to_map, args=args_to_map)
-        self.procs['tf_to_map'] = tf_to_map
-
-    def stop_tf_publisher(self):
-        if 'tf_from_world' in self.procs:
-            self.rs.term_node(self.procs['tf_from_world'])
-        if 'tf_to_map' in self.procs:
-            self.rs.term_node(self.procs['tf_to_map'])
 
     def start_amcl(self):
         amcl = subprocess.Popen(

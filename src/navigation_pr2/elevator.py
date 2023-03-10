@@ -124,7 +124,6 @@ class WaitforNextFloor(smach.State):
         self.multiple_floor = rospy.get_param('~multiple_floor', True)
         self.speak = client
         self.mapping=mapping
-        self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
         rospy.loginfo('waiting for spot_map_server/change_floor...')
         rospy.wait_for_service('spot_map_server/change_floor')
         self.eus_floor = rospy.ServiceProxy('/spot_map_server/change_floor', ChangeFloor)
