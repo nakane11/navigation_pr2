@@ -25,7 +25,7 @@ class WaitforHandImpact(smach.State):
         rospy.sleep(0.8)
         goal = PR2GripperEventDetectorGoal()
         goal.command.trigger_conditions = pr2_gripper_sensor_msgs.msg.PR2GripperEventDetectorCommand.ACC
-        goal.command.acceleration_trigger_magnitude = 10.0
+        goal.command.acceleration_trigger_magnitude = 20.0
         self.ac.send_goal(goal)
         if self.ac.wait_for_result(timeout=rospy.Duration(8)):
             ret = self.ac.get_result()

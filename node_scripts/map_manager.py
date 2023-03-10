@@ -94,6 +94,7 @@ class RobotService(object):
 class MapManager(object):
     
     def __init__(self):
+        print(1)
         # self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
         self.dir_path = '/tmp/raw_maps'
         if not os.path.exists(self.dir_path):
@@ -108,8 +109,6 @@ class MapManager(object):
         self.listener = tf.TransformListener()
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
         self.ac = actionlib.SimpleActionServer('~change_floor', ChangeFloorAction, self.floor_cb)
-        rospy.wait_for_service('/move_base/clear_costmaps')        
-        self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
 
     def handler(self):
         try:
@@ -119,7 +118,6 @@ class MapManager(object):
             pass
 
     def floor_cb(self, goal):
-        print(10)
         if goal.command == 0:
             self.start_make_map(goal.floor)
         elif goal.command == 1:
@@ -129,7 +127,6 @@ class MapManager(object):
         elif goal.command == 3:
             self.change_floor(goal.floor)
         self.ac.set_succeeded(ChangeFloorResult())
-        print(20)
 
     def set_current_floor(self, floor):
         self.current_floor = floor
@@ -146,6 +143,9 @@ class MapManager(object):
         self.initialpose_dict[floor] = a
         print(a)
         self.set_current_floor(floor)
+        rospy.sleep(1)
+        rospy.wait_for_service('/move_base/clear_costmaps')
+        self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
         self.clear_costmaps()
 
     def change_make_map(self, floor):
