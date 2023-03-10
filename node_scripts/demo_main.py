@@ -158,7 +158,7 @@ class NavigationSmach():
                                        transitions={'succeeded':'MOVE_TO_INSIDE_POSITION',
                                                     'aborted':'MOVE_TO_RIDING_POSITION_FAILED',
                                                     'retry': 'MOVE_TO_RIDING_POSITION'})
-                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION', MovetoInsidePosition(ri=self.ri),
+                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION', MovetoInsidePosition(ri=self.ri, off=False),
                                        transitions={'succeeded':'HOLD_DOOR',
                                                     'aborted':'MOVE_TO_INSIDE_POSITION'})
                 smach.StateMachine.add('HOLD_DOOR', HoldDoor(model=self.r, ri=self.ri, riding=True),
@@ -170,7 +170,7 @@ class NavigationSmach():
                 smach.StateMachine.add('HOLD_DOOR_OFF', HoldDoor(model=self.r, ri=self.ri, riding=False),
                                        transitions={'succeeded':'MOVE_TO_INSIDE_POSITION_OFF',
                                                     'aborted':'aborted'})
-                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION_OFF', MovetoInsidePosition(ri=self.ri),
+                smach.StateMachine.add('MOVE_TO_INSIDE_POSITION_OFF', MovetoInsidePosition(ri=self.ri, off=True),
                                        transitions={'succeeded':'MOVE_TO_RIDING_POSITION_OFF',
                                                     'aborted':'MOVE_TO_INSIDE_POSITION_OFF'})
                 smach.StateMachine.add('MOVE_TO_RIDING_POSITION_OFF', MovetoRidingPosition(),

@@ -323,16 +323,20 @@ class MovetoRidingPositionFailed(smach.State):
         return 'aborted'
 
 class MovetoInsidePosition(smach.State):
-    def __init__(self, ri):
+    def __init__(self, ri, off):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted'],
                              input_keys=['adjust_riding'])
         self.ri = ri
+        self.off = off
 
     def execute(self, userdata):
         floor_name = rospy.get_param('~floor')
         diff = userdata.adjust_riding[floor_name]
         # unsafeで移動
-        self.ri.go_pos_unsafe(x=-diff[0], y=-diff[1])
+        if off:
+            self.ri.go_pos_unsafe(x=diff[0], y=diff[1])
+        else:
+            self.ri.go_pos_unsafe(x=-diff[0], y=-diff[1])
         return 'succeeded'
 
 class HoldDoor(smach.State):
