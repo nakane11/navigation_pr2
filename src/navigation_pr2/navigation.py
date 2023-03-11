@@ -210,9 +210,10 @@ class CheckIfGoalReached(smach.State):
 
 class ExecuteState(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'move'],
+        smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'move', 'elevator'],
                              input_keys=['waypoints', 'next_point', 'status'],
                              output_keys=['status'])
+        self.elevator_status = False
 
     def execute(self, userdata):
         if self.preempt_requested():
@@ -222,17 +223,17 @@ class ExecuteState(smach.State):
         index = userdata['next_point']
         status = userdata['status']
         target_point = waypoints[index]
-        print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
+        # print("index:{}\n name:{}\n type:{}".format(index, target_point.name, target_point.type))
         if target_point.type == 0:
             userdata.status = 'spot'
             return 'move'
         if target_point.type == 1:
-            if status != 'elevator':
-                userdata.status = 'elevator'
+            if self.elevator_status == False:
+                self.elevator_status = True
+                return 'elevator'
             else:
-                userdata.status = 'elevator off'
-            return 'move'
-
+                self.elevator_status = False
+                return 'succeeded'
         return 'succeeded'
 
 class SendMoveTo(smach.State):
@@ -284,6 +285,7 @@ class SendMoveTo(smach.State):
 
         retry_count = 0
         distance = 10
+
         while(distance > self.distance_tolerance):
             now = rospy.Time.now()
             self.listener.waitForTransform(self.goal_frame_id, self.base_frame_id, now, rospy.Duration(4.0))
@@ -319,41 +321,8 @@ class SendMoveTo(smach.State):
                 rospy.logwarn("Finally Move_base failed because server received cancel request or goal was aborted")
                 self.speak.say('失敗しました')
                 return 'aborted'
-            rospy.loginfo("{}m to the next waypoint.".format(distance))
-        if userdata['status'] == 'elevator off':
-            self.speak.say('手を繋いで下さい')
-                # 手繋ぎ
-            if self.use_hand:
-                goal = StartHoldingGoal(command=0)
-                self.hand_client.send_goal(goal)
-                if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
-                    self.hand_client.cancel_all_goals()
-                    self.speak.say('中断しました')
-                    return 'timeout'
-                print(self.hand_client.get_result())
-            else:
-                rospy.loginfo('skipped hand holding')
-            if not self.debug:
-                ret = self.controller([], ['l_arm_controller'], None)
-                print(ret)
-            else:
-                rospy.loginfo('skipped switch controller')
-            self.speak.say('移動します')
+            # rospy.loginfo("{}m to the next waypoint.".format(distance))
 
-        if userdata['status'] == 'elevator':
-            if self.use_hand:
-                goal = StartHoldingGoal(command=3)
-                self.hand_client.send_goal(goal)
-                if not self.hand_client.wait_for_result(timeout=rospy.Duration(40)):
-                    self.hand_client.cancel_all_goals()
-                    self.speak.say('中断しました')
-                    return 'timeout'
-                print(self.hand_client.get_result())
-            else:
-                rospy.loginfo('skipped hand holding')
-            if not self.debug:
-                ret = self.controller(['l_arm_controller'], [], None)
-            return 'elevator'
         return 'succeeded'
 
 class Interrupt(smach.State):

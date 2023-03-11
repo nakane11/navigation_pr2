@@ -1,20 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import argparse
 import navigation_pr2.user_data
 from navigation_pr2 import SpeakClient
 from navigation_pr2.mapping import *
 from navigation_pr2.navigation import *
 from navigation_pr2.idling import *
 from navigation_pr2.hand_impact import *
+from navigation_pr2.elevator_teaching import *
+from navigation_pr2.elevator_navigation import *
+from navigation_pr2.hand_holding import *
+
 import skrobot
 from skrobot.interfaces.ros import PR2ROSRobotInterface
-from navigation_pr2.elevator import *
-import tf
+
+import argparse
 import rospy
 import smach
 import smach_ros
+import tf
 from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 
 class NavigationSmach():
@@ -75,7 +79,7 @@ class NavigationSmach():
                                                input_keys=['riding_position', 'adjust_riding'],
                                                output_keys=['riding_position', 'adjust_riding'])
         with sm_teach_elevator:
-            smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener),
+            smach.StateMachine.add('TEACH_RIDING_POSITION', TeachRidingPosition(client=self.speak, listener=self.listener, ri=self.ri),
                                    transitions={'succeeded':'TEACH_INSIDE_POSITION',
                                                 'aborted':'TEACH_RIDING_POSITION'})
             smach.StateMachine.add('TEACH_INSIDE_POSITION', TeachInsidePosition(client=self.speak, ri=self.ri),
@@ -87,7 +91,7 @@ class NavigationSmach():
             smach.StateMachine.add('MOVE_TO_EXIT', MovetoExit(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'TEACH_OUTSIDE_ELEVATOR',
                                                 'aborted':'aborted'})
-            smach.StateMachine.add('TEACH_OUTSIDE_ELEVATOR', TeachOutsideElevator(client=self.speak),
+            smach.StateMachine.add('TEACH_OUTSIDE_ELEVATOR', TeachOutsideElevator(client=self.speak, ri=self.ri),
                                    transitions={'succeeded':'succeeded',
                                                 'aborted':'TEACH_OUTSIDE_ELEVATOR'})
 
@@ -101,7 +105,7 @@ class NavigationSmach():
             con_moving = smach.Concurrence(outcomes=['outcome', 'succeeded', 'ask', 'reached',
                                                      'interrupt', 'aborted', 'start mapping', 'elevator'],
                                            input_keys=['waypoints', 'next_point', 'goal_spot', 'status'],
-                                           output_keys=['next_point', 'status'],
+                                           output_keys=['waypoints', 'next_point', 'status'],
                                            default_outcome='outcome',
                                            child_termination_cb = con_moving_child_term_cb,
                                            outcome_cb=con_moving_out_cb)
@@ -126,12 +130,12 @@ class NavigationSmach():
                     smach.StateMachine.add('EXECUTE_STATE', ExecuteState(),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted',
-                                                        'move':'SEND_MOVE_TO'})
+                                                        'move':'SEND_MOVE_TO',
+                                                        'elevator':'elevator'})
                     smach.StateMachine.add('SEND_MOVE_TO', SendMoveTo(client=self.speak),
                                            transitions={'succeeded':'CHECK_IF_GOAL_REACHED',
                                                         'aborted':'aborted',
-                                                        'preempted':'aborted',
-                                                        'elevator':'elevator'})
+                                                        'preempted':'aborted'})
                 sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:
                     smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
@@ -145,12 +149,19 @@ class NavigationSmach():
                 smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
             sm_navigation_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
-                                         input_keys=['riding_position', 'adjust_riding'])
+                                                        input_keys=['riding_position', 'adjust_riding', 'waypoints', 'next_point'])
             with sm_navigation_elevator:
+                smach.StateMachine.add('MOVE_TO_ELEVATOR_FRONT', MovetoElevatorFront(),
+                                       transitions={'succeeded':'STOP_HAND_HOLDING',
+                                                    'aborted':'MOVE_TO_ELEVATOR_FRONT',
+                                                    'preempted':'aborted'})
+                smach.StateMachine.add('STOP_HAND_HOLDING', StopHandHolding(client=self.speak),
+                                       transitions={'succeeded':'WAIT_FOR_ELEVATOR_AVAILABLE',
+                                                    'aborted':'STOP_HAND_HOLDING'})
                 smach.StateMachine.add('WAIT_FOR_ELEVATOR_AVAILABLE', WaitforElevatorAvailable(client=self.speak),
                                        transitions={'succeeded':'MOVE_TO_RIDING_POSITION',
                                                     'aborted':'WAIT_FOR_ELEVATOR_AVAILABLE'})
-                smach.StateMachine.add('MOVE_TO_RIDING_POSITION', MovetoRidingPosition(),
+                smach.StateMachine.add('MOVE_TO_RIDING_POSITION', MovetoRidingPosition(ri=self.ri, off=False),
                                        transitions={'succeeded':'MOVE_TO_INSIDE_POSITION',
                                                     'retry':'MOVE_TO_RIDING_POSITION',
                                                     'aborted':'MOVE_TO_RIDING_POSITION_FAILED'})
@@ -173,11 +184,13 @@ class NavigationSmach():
                 smach.StateMachine.add('MOVE_TO_INSIDE_POSITION_OFF', MovetoInsidePosition(ri=self.ri, off=True),
                                        transitions={'succeeded':'MOVE_TO_RIDING_POSITION_OFF',
                                                     'aborted':'MOVE_TO_INSIDE_POSITION_OFF'})
-                smach.StateMachine.add('MOVE_TO_RIDING_POSITION_OFF', MovetoRidingPosition(),
-                                       transitions={'succeeded':'succeeded',
+                smach.StateMachine.add('MOVE_TO_RIDING_POSITION_OFF', MovetoRidingPosition(ri=self.ri, off=True),
+                                       transitions={'succeeded':'RESUME_HAND_HOLDING',
                                                     'retry':'MOVE_TO_RIDING_POSITION_OFF',
                                                     'aborted':'aborted'})
-
+                smach.StateMachine.add('RESUME_HAND_HOLDING', ResumeHandHolding(client=self.speak),
+                                       transitions={'succeeded':'succeeded',
+                                                    'aborted':'RESUME_HAND_HOLDING'})
 
             smach.StateMachine.add('SET_GOAL', SetGoal(client=self.speak),
                                    transitions={'succeeded':'GET_WAYPOINTS',
