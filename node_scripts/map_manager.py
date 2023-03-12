@@ -95,8 +95,8 @@ class MapManager(object):
     
     def __init__(self):
         print(1)
-        # self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        self.dir_path = '/tmp/raw_maps'
+        self.dir_path = '/tmp/raw_maps_{}'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        # self.dir_path = '/tmp/raw_maps'
         if not os.path.exists(self.dir_path):
             os.mkdir(self.dir_path)
         self.scan_topic = rospy.get_param('~scan_topic', '/base_scan_filtered/scan')
@@ -105,10 +105,12 @@ class MapManager(object):
         self.current_floor = None
         self.frame_dict = {}
         self.initialpose_dict = {}
+        self.start_map = 0
         rospy.on_shutdown(self.handler)
         self.listener = tf.TransformListener()
         self.initialpose = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=1)
         self.ac = actionlib.SimpleActionServer('~change_floor', ChangeFloorAction, self.floor_cb)
+        
 
     def handler(self):
         try:
@@ -137,11 +139,11 @@ class MapManager(object):
         self.stop_map_server()
         self.stop_amcl()
         self.start_gmapping(floor)
-        a = None
-        while a is None:
-            a = self.get_robotpose()
-        self.initialpose_dict[floor] = a
-        print(a)
+        # a = None
+        # while a is None:
+        #     a = self.get_robotpose()
+        # self.initialpose_dict[floor] = a
+        # print(a)
         self.set_current_floor(floor)
         rospy.sleep(1)
         rospy.wait_for_service('/move_base/clear_costmaps')
@@ -153,15 +155,25 @@ class MapManager(object):
         while not os.path.exists(filepath):
             continue
         rospy.loginfo('Successfully saved {}!'.format(filepath))
+        if self.start_map == 0: # empty to floor 6
+            self.start_map = 1
+        elif self.start_map == 1: # floor 6 to floor 3
+            a = None
+            while a is None:
+                a = self.get_robotpose()
+            print(a)
+            self.initialpose_dict[self.current_floor] = a
+            self.start_map = 2
         self.stop_gmapping()
         # self.stop_tf_publisher()
         # self.start_tf_publisher(floor)
         self.start_gmapping(floor)
-        a = None
-        while a is None:
-            a = self.get_robotpose()
-        print(a)
-        self.initialpose_dict[floor] = a
+        if self.start_map == 2:
+            a = None
+            while a is None:
+                a = self.get_robotpose()
+            print(a)
+            self.initialpose_dict[floor] = a
         self.set_current_floor(floor)
         self.clear_costmaps()
 
