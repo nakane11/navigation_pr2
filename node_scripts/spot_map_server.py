@@ -222,7 +222,7 @@ class SpotMapServer(object):
         if len(start_node_candidates) > 0:
             start_node_candidates = sorted(start_node_candidates, key=lambda x: compute_difference_between_poses(curr_pose, self.active_graph.nodes[x]['pose']))
             start_node = start_node_candidates[0]
-        print('start:{}'.format(start_node))
+            print('start:{}'.format(start_node))
         # ゴールがあるgraphを探索
         for name, graph in self.graph_dict.items():
             goal_graph = None
@@ -258,8 +258,11 @@ class SpotMapServer(object):
                     for i in path_list:
                         node = self.node_to_msg(i, self.active_graph.nodes[i])
                         waypoints.append(node)
+                    waypoints = changeOrientation(waypoints)
                 #現在と違う階の場合
                 else:
+                    waypoints_source = []
+                    waypoints_target = []
                     for i in list(self.active_graph.nodes):
                         n = self.active_graph.nodes[i]
                         print("[source] name:{}, type:{}".format(i, n['type']))
@@ -282,12 +285,14 @@ class SpotMapServer(object):
                         path_list_target_floor = nx.shortest_path(goal_graph, source=elevator_target, target=goal)
                         for i in path_list_source_floor:
                             node = self.node_to_msg(i, self.active_graph.nodes[i])
-                            waypoints.append(node)
+                            waypoints_source.append(node)
+                        waypoints_source = changeOrientation(waypoints_source)
                         for i in path_list_target_floor:
                             node = self.node_to_msg(i, goal_graph.nodes[i])
-                            waypoints.append(node)
+                            waypoints_target.append(node)
+                        waypoints_target = changeOrientation(waypoints_target)
+                        waypoints = waypoints_source + waypoints_target
                 result_array.append(0)
-                waypoints = changeOrientation(waypoints)
                 self.pose_pub.publish(publish_waypoints(waypoints))
                 waypoints_array.extend(waypoints)
                 waypoints_length.append(len(waypoints))
