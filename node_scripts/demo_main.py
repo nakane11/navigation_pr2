@@ -146,7 +146,7 @@ class NavigationSmach():
 
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
-                smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
+                # smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
             sm_navigation_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
                                                         input_keys=['riding_position', 'adjust_riding', 'waypoints', 'next_point'])
