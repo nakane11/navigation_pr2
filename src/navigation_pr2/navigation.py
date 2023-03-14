@@ -390,7 +390,7 @@ class StartNavigation(smach.State):
         else:
             goal = MoveWristGoal()
             self.wrist_client.send_goal(goal)
-            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(10)):
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(20)):
                 self.wrist_client.cancel_all_goals()
                 self.speak.say('中断しました')
                 # return 'timeout'

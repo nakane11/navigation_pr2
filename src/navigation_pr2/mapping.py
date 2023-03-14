@@ -167,6 +167,7 @@ class SendWithName(smach.State):
         name = userdata.new_spot_name
         rospy.loginfo("add new spot: {}".format(name))
         if re.search(r'.*エ.*ベータ.*$', name) is not None:
+            print("sendwithname elevator")
             goal = RecordSpotGoal()
             goal.command = 3
             goal.name = name

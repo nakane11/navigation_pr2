@@ -72,7 +72,8 @@ class Initialize(smach.State):
         except:
             pass
         if not self.dr:
-            rospy.loginfo('failed waiting for move_base_node/DWAPlannerROS...')            
+            rospy.loginfo('failed waiting for move_base_node/DWAPlannerROS...')
+        # self.ver = rospy.get_param('~move_base_version', 'noetic')
 
     def execute(self, userdata):
         userdata.riding_position = {}
@@ -81,7 +82,10 @@ class Initialize(smach.State):
             self.dr.update_configuration({"acc_lim_x" : 2.0})
             self.dr.update_configuration({"acc_lim_y" : 2.0})
             self.dr.update_configuration({"acc_lim_theta" : 2.2})
-            self.dr.update_configuration({"max_rot_vel" : 1.3})
+        # if self.ver == 'noetic':
+        #     self.dr.update_configuration({"max_vel_theta" : 1.3})
+        # else:
+        #     self.dr.update_configuration({"max_rot_vel" : 1.3})
         return 'succeeded'
 
 class Explain(smach.State):
