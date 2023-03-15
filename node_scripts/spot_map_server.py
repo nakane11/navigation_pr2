@@ -8,7 +8,8 @@ import jsonpickle
 import json
 from networkx.readwrite import json_graph
 import rospy
-import tf
+# import tf
+import tf2_ros
 import actionlib
 import math
 from threading import Lock
@@ -56,8 +57,11 @@ class SpotMapServer(object):
         self.active_graph = nx.MultiGraph()
         self.active_graph_name = 'initial'
 
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener =tf2_ros.TransformListener(self.tfBuffer)
+        
         self.pose_pub = rospy.Publisher('waypoints', PoseArray, queue_size=1)
-        self.listener = tf.TransformListener()
+        # self.listener = tf.TransformListener()
         self.node_pub = rospy.Publisher('~nodes', MarkerArray, queue_size=1)
         self.edge_pub = rospy.Publisher('~edges', MarkerArray, queue_size=1)        
         self.start = rospy.Service('~start', Empty, self.start_auto_map)
@@ -95,9 +99,12 @@ class SpotMapServer(object):
         while not rospy.is_shutdown():
             rate.sleep()
             if self.auto_map_enabled:
-                if not self.listener.canTransform('/map', '/base_footprint', rospy.Time(0)):
+                if not self.tfBuffer.can_transform('map', 'base_footprint', rospy.Time(0), timeout=rospy.Duration(10.0)):
                     rospy.loginfo('wait for transform')
                     continue
+                # if not self.listener.canTransform('/map', '/base_footprint', rospy.Time(0)):
+                #     rospy.loginfo('wait for transform')
+                #     continue
                 curr_pose = self.get_robotpose()
                 if not curr_pose:
                     rospy.loginfo('failed to get pose')
@@ -347,18 +354,20 @@ class SpotMapServer(object):
 
     def get_robotpose(self):
         try:
-            (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
+            trans = self.tfBuffer.lookup_transform('map', 'base_footprint', rospy.Time(0), timeout=rospy.Duration(10.0))
+        # try:
+        #     (trans,rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
         except Exception as e:
             rospy.logerr(e)
             return False
         pose = Pose()
-        pose.position.x = trans[0]
-        pose.position.y = trans[1]
-        pose.position.z = trans[2]
-        pose.orientation.x = rot[0]
-        pose.orientation.y = rot[1]
-        pose.orientation.z = rot[2]
-        pose.orientation.w = rot[3]        
+        pose.position.x = trans.transform.translation.x
+        pose.position.y = trans.transform.translation.y
+        pose.position.z = trans.transform.translation.z
+        pose.orientation.x = trans.transform.rotation.x
+        pose.orientation.y = trans.transform.rotation.y
+        pose.orientation.z = trans.transform.rotation.z
+        pose.orientation.w = trans.transform.rotation.w
         return pose
 
     def add_spot(self, pose, name=None):
@@ -370,6 +379,7 @@ class SpotMapServer(object):
                 node_name = name
             self.active_graph.add_node(node_name)
             rospy.loginfo('Add node {}'.format(node_name))
+            print(pose)
             self.active_graph.nodes[node_name]['type'] = 0
             self.active_graph.nodes[node_name]['pose'] = pose
             self.active_graph.nodes[node_name]['floor'] = self.active_graph_name
