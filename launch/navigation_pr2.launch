@@ -2,10 +2,11 @@
   <arg name="speaker_volume" default="1.0" doc="robot speaking volume" />
   <arg name="inside_pr2" default="true" />
 
+  <param name="/navigation_state_machine/output" type="string" value="/tmp/out.json" />
 
   <include file="$(find virtual_force_drag)/launch/pr2_lead.launch" />
 
-  <include file="$(find teach_spot)/launch/human_filter_pr2.launch" />
+  <!-- <include file="$(find teach_spot)/launch/human_filter_pr2.launch" /> -->
 
   <!-- <include file="$(find navigation_utils)/launch/tf_transposer.launch" /> -->
 
@@ -16,6 +17,7 @@
           output="screen"
           clear_params="true" >
       <rosparam subst_value="true">
+        <!-- input_data: "/tmp/map.json" -->
         output_data: "/tmp/map.json"
       </rosparam>
     </node>
@@ -63,6 +65,10 @@
         pkg="navigation_pr2" type="map_manager.py"
         output="screen"
         clear_params="true" >
+      <rosparam subst_value="true">
+        scan_topic: "/base_scan_filtered/scan"
+      </rosparam>
+
   </node>
 
   <node pkg="roseus" type="roseus" name="move_wrist" respawn="true"
@@ -73,7 +79,7 @@
         pkg="navigation_pr2" type="republish_conversation.py"
         output="screen" respawn="true"
         clear_params="true" >
-    <remap from="~input1" to="/Tablet/voice_stamped/mux" />
+    <remap from="~input1" to="/Tablet/voice_stamped" />
     <!-- <remap from="~input2" to="/robotsound_jp/goal" />  -->
     <remap from="~input2" to="/speak_node/say/goal" />
     <remap from="~input3" to="/speak_node/say" />
@@ -95,6 +101,12 @@
 
   <node name="human_counter"
         pkg="navigation_pr2" type="human_counter.py"
+        output="screen"
+        clear_params="true" >
+  </node>
+
+  <node name="go_pos"
+        pkg="partial_rotate" type="go_pos.py"
         output="screen"
         clear_params="true" >
   </node>

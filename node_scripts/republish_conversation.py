@@ -62,7 +62,7 @@ class RepublishConversation(object):
             
         transform_fn = self.transform_fns[topic_name]
         transformed_text = transform_fn(msg)
-        print("msg:{}".format(msg))
+        # print("msg:{}".format(msg))
         print("text:{}".format(transformed_text))
         if self.reverse_lines:
             self.lines = [self.colored_message(topic_name, transformed_text)] + self.lines
