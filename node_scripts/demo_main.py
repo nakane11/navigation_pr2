@@ -20,6 +20,7 @@ import smach
 import smach_ros
 import tf
 from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
+from std_srvs.srv import Empty, EmptyResponse
 
 class NavigationSmach():
     def __init__(self):
@@ -28,8 +29,8 @@ class NavigationSmach():
         self.output_path = rospy.get_param('~output', None)
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
-        # self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
-        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/google', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        self.clear_speech = rospy.Service('~clear_speech', Empty, self.clear_speech_service)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         self.r = skrobot.models.PR2()
@@ -38,9 +39,13 @@ class NavigationSmach():
     def speech_cb(self, msg):
         if msg.candidates.confidence < 0.3:
             return
-        if msg.header.stamp - self.last_speech_time > rospy.Duration(0) or True:
+        if msg.header.stamp >= self.last_speech_time:
             rospy.set_param('~speech_raw', msg.candidates.transcript[0].replace(' ', ''))
-            self.last_speech_time = msg.header.stamp
+
+    def clear_speech_service(self, req):
+        self.last_speech_time = rospy.Time.now()
+        rospy.loginfo("Cleared speech queue")
+        return EmptyResponse()
 
     def smach(self):
         ###################################
