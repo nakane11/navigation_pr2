@@ -1,5 +1,4 @@
 <launch>
-  <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
   <arg name="launch_sound_play" default="false" doc="Launch sound_play node to speak" />
   <arg name="launch_audio_capture" default="false" doc="Launch audio_capture node to publish audio topic from microphone" />
 
@@ -87,45 +86,26 @@
     </rosparam>
     <param name="device" value="$(arg device)" />
   </node>
-
-  <group if="$(arg use_vosk)" >
-    <node name="is_speaking_relay" pkg="topic_tools" type="relay"
-          args="/is_speaking /tts/status" />
-
-    <node name="speech_recognition"
-          pkg="ros_vosk" type="vosk_node.py"
-          respawn="true" >
-    </node>
-
-    <node name="string_to_speech_recognition_candidates"
-          pkg="topic_tools" type="transform"
-          args="/speech_recognition/final_result /Tablet/voice
-                speech_recognition_msgs/SpeechRecognitionCandidates
-                'speech_recognition_msgs.msg.SpeechRecognitionCandidates(transcript=[m.data])'
-                --import speech_recognition_msgs --wait-for-start" >
-    </node>
-
-  </group>
-
-  <group unless="$(arg use_vosk)" >  
-    <node name="speech_recognition"
-          pkg="ros_speech_recognition" type="speech_recognition_node.py"
-          output="screen"
-          respawn="true" >
-      <remap from="sound_play" to="robotsound" />
-      <rosparam subst_value="true">
-        audio_topic: $(arg audio_topic)
-        voice_topic: $(arg voice_topic)
-        n_channel: $(arg n_channel)
-        depth: $(arg depth)
-        sample_rate: $(arg sample_rate)
-        engine: $(arg engine)
-        language: $(arg language)
-        continuous: $(arg continuous)
-        enable_sound_effect: true
-      </rosparam>
-    </node>
-  </group>
+  
+  <node name="speech_recognition"
+        pkg="ros_speech_recognition" type="speech_recognition_node.py"
+        output="screen"
+        respawn="true" >
+    <remap from="sound_play" to="robotsound" />
+    <rosparam subst_value="true">
+      audio_topic: $(arg audio_topic)
+      voice_topic: $(arg voice_topic)
+      n_channel: $(arg n_channel)
+      depth: $(arg depth)
+      sample_rate: $(arg sample_rate)
+      engine: $(arg engine)
+      language: $(arg language)
+      continuous: $(arg continuous)
+      enable_sound_effect: true
+      vosk_model_path: /home/nakane/ros/pr2_ws/src/ros-vosk/models/vosk-model-ja-0.22
+      self_cancellation: false
+    </rosparam>
+  </node>
 
   <!-- <node name="input_sr_mux" pkg="topic_tools" type="mux" -->
   <!--       respawn="true" -->
