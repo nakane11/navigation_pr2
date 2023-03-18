@@ -6,11 +6,11 @@ from speech_recognition_msgs.msg import SpeechRecognitionCandidates, SpeechRecog
 
 class FilterVosk(object):
     def __init__(self):
-        self.pub = rospy.Publisher("/Tablet/voice/filtered", SpeechRecognitionCandidates, queue_size=1)
-        self.pub_stamped = rospy.Publisher("/Tablet/voice_stamped/filtered", SpeechRecognitionCandidatesStamped, queue_size=1)
-        self.sub = rospy.Subscriber("/Tablet/voice", SpeechRecognitionCandidates, self.cb, queue_size=1)
-        self.sub_stamped = rospy.Subscriber("/Tablet/voice_stamped", SpeechRecognitionCandidatesStamped, self.cb_stamped, queue_size=1)
-        self.black_list = ["あー", "えー", "ん"]
+        self.pub = rospy.Publisher("/Tablet/voice/vosk_filtered", SpeechRecognitionCandidates, queue_size=1)
+        self.pub_stamped = rospy.Publisher("/Tablet/voice_stamped/vosk_filtered", SpeechRecognitionCandidatesStamped, queue_size=1)
+        self.sub = rospy.Subscriber("/Tablet/voice/vosk", SpeechRecognitionCandidates, self.cb, queue_size=1)
+        self.sub_stamped = rospy.Subscriber("/Tablet/voice_stamped/vosk", SpeechRecognitionCandidatesStamped, self.cb_stamped, queue_size=1)
+        self.black_list = ["あー", "えー", "ん", "あ", "うん"]
         
     def cb(self, msg):
         for word in self.black_list:
