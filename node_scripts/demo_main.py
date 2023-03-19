@@ -14,6 +14,7 @@ from navigation_pr2.hand_holding import *
 import skrobot
 from skrobot.interfaces.ros import PR2ROSRobotInterface
 
+import mojimoji
 import argparse
 import rospy
 import smach
@@ -40,7 +41,10 @@ class NavigationSmach():
         if msg.candidates.confidence < 0.3:
             return
         if msg.header.stamp >= self.last_speech_time:
-            rospy.set_param('~speech_raw', msg.candidates.transcript[0].replace(' ', ''))
+            text = msg.candidates.transcript[0].replace(' ', '')
+            if isinstance(text, str):
+                text =  mojimoji.zen_to_han(text.decode('utf-8'), kana=False)
+            rospy.set_param('~speech_raw', text)
 
     def clear_speech_service(self, req):
         self.last_speech_time = rospy.Time.now()
