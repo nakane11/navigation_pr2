@@ -390,7 +390,7 @@ class StartNavigation(smach.State):
         else:
             goal = MoveWristGoal()
             self.wrist_client.send_goal(goal)
-            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(20)):
+            if not self.wrist_client.wait_for_result(timeout=rospy.Duration(30)):
                 self.wrist_client.cancel_all_goals()
                 self.speak.say('中断しました')
                 # return 'timeout'
@@ -416,7 +416,8 @@ class StartNavigation(smach.State):
         return 'succeeded'
 
 def con_moving_child_term_cb(outcome_map):
-    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded' or outcome_map['HAND_IMPACT'] == 'succeeded':
+    # if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded' or outcome_map['HAND_IMPACT'] == 'succeeded':
+    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
         return True
     if outcome_map['TALK_IN_MOVING'] == 'interrupt':
         return True
@@ -430,8 +431,8 @@ def con_moving_child_term_cb(outcome_map):
         return False
 
 def con_moving_out_cb(outcome_map):
-    if outcome_map['HAND_IMPACT'] == 'succeeded':
-        return 'ask'
+    # if outcome_map['HAND_IMPACT'] == 'succeeded':
+    #     return 'ask'
     if outcome_map['SEND_WAYPOINT'] == 'succeeded':
         return 'reached'
     if outcome_map['TALK_IN_MOVING'] == 'succeeded':
