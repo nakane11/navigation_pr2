@@ -29,7 +29,7 @@ class NavigationSmach():
         self.output_path = rospy.get_param('~output', None)
         self.debug = rospy.get_param('~debug', False)
         self.last_speech_time = rospy.Time.now()
-        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped', SpeechRecognitionCandidatesStamped, self.speech_cb)
+        self.speech_sub = rospy.Subscriber('/Tablet/voice_stamped/mux', SpeechRecognitionCandidatesStamped, self.speech_cb)
         self.clear_speech = rospy.Service('~clear_speech', Empty, self.clear_speech_service)
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
