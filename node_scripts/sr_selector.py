@@ -39,8 +39,6 @@ class SRSelector():
         if res == 0:
             if self.trigger == True:
                 rospy.loginfo('network connected')
-                print(connect_sound)
-                self.sound.playWave(connect_sound, replace=False)
                 self.trigger = False
             if self.connected:
                 self.switch("google")
@@ -50,7 +48,6 @@ class SRSelector():
         else:
             if self.trigger == False:
                 rospy.loginfo('network disconnected')
-                self.sound.playWave(disconnect_sound, replace=False)
                 self.trigger = True
                 self.switch("vosk")
             self.pub.publish(Bool(data=False))
@@ -59,10 +56,12 @@ class SRSelector():
         if self.active_engine == engine:
             return
         if engine == "google":
-            mux_client("/Tablet/voice_stamped/google")
+            self.sound.playWave(connect_sound, replace=False)
+            self.mux_client("/Tablet/voice_stamped/google")
             rospy.loginfo("switch to google")
         if engine == "vosk":
-            mux_client("/Tablet/voice_stamped/vosk_filtered")
+            self.sound.playWave(disconnect_sound, replace=False)
+            self.mux_client("/Tablet/voice_stamped/vosk_filtered")
             rospy.loginfo("switch to vosk")
         self.active_engine = engine
         
