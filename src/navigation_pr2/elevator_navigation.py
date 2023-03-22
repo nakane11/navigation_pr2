@@ -180,14 +180,20 @@ class HoldDoor(smach.State):
         start_time = rospy.Time.now()
         if self.riding:
             while True :
-                ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
-                print(ret)
+                try:
+                    ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
+                    print(ret)
+                except Exception as e:
+                    print(e)
                 if ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
                     break
         else:
             while True:
-                ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
-                print(ret)
+                try:
+                    ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
+                    print(ret)
+                except Exception as e:
+                    print(e)
                 if not ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
                     break
         # 乗り込んだらtuckarm
