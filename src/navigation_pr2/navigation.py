@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rospy
+import rosnode
 import smach
 import re
 import actionlib
@@ -47,6 +48,14 @@ class GetWaypoints(smach.State):
         self.call = rospy.ServiceProxy('/spot_map_server/find_path', Path)
 
     def execute(self, userdata):
+        rosnode.kill_nodes(["/hand_pose_estimation_2d"])
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            is_alive = rosnode.rosnode_ping("/hand_pose_estimation_2d", max_count=1, verbose=False)
+            if is_alive is True:
+                break
+            rospy.logwarn("waiting hand_pose_estimation_2d node ...")
+            rate.sleep()
         goal_name = userdata.goal_spot
         self.speak.say('経路を探します。')
         res = self.call(goal_name=goal_name)
