@@ -193,7 +193,7 @@ class NavigationSmach():
                                                     'aborted':'aborted'})
                 smach.StateMachine.add('WAIT_FOR_NEXT_FLOOR_NAVIGATION', WaitforNextFloor(client=self.speak, mapping=False),
                                        transitions={'succeeded':'HOLD_DOOR_OFF',
-                                                    'aborted':'aborted'})
+                                                    'aborted':'WAIT_FOR_NEXT_FLOOR_NAVIGATION'})
                 smach.StateMachine.add('HOLD_DOOR_OFF', HoldDoor(model=self.r, ri=self.ri, riding=False),
                                        transitions={'succeeded':'MOVE_TO_INSIDE_POSITION_OFF',
                                                     'aborted':'aborted'})

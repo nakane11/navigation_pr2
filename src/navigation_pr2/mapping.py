@@ -70,7 +70,7 @@ class WaitForTeaching(smach.State):
             self.initialized = True
             return 'aborted'
 
-        if not wait_for_speech(timeout=60):
+        if not wait_for_speech(timeout=120):
             return 'timeout'
         speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
         rospy.delete_param('~speech_raw')
