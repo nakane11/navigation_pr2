@@ -183,19 +183,23 @@ class HoldDoor(smach.State):
                 try:
                     ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
                     print(ret)
+                    if ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
+                        break
                 except Exception as e:
                     print(e)
-                if ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
-                    break
+                    if (rospy.Time.now() - start_time).to_sec() > 10:
+                        break
         else:
             while True:
                 try:
                     ret = rospy.wait_for_message('/human_counter/output', Bool, timeout=2)
                     print(ret)
+                    if not ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
+                        break
                 except Exception as e:
                     print(e)
-                if not ret.data or (rospy.Time.now() - start_time).to_sec() > 10:
-                    break
+                    if (rospy.Time.now() - start_time).to_sec() > 10:
+                        break
         # 乗り込んだらtuckarm
         rospy.sleep(5)
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
