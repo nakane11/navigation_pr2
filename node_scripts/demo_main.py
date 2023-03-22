@@ -20,6 +20,7 @@ import rospy
 import smach
 import smach_ros
 import tf
+import control_msgs.msg
 from speech_recognition_msgs.msg import SpeechRecognitionCandidatesStamped
 from std_srvs.srv import Empty, EmptyResponse
 
@@ -35,6 +36,12 @@ class NavigationSmach():
         self.speak = SpeakClient()
         self.listener = tf.TransformListener()
         self.r = skrobot.models.PR2()
+
+        self.move_base_trajectory_action = actionlib.SimpleActionClient(
+            "/base_controller/follow_joint_trajectory",
+            control_msgs.msg.FollowJointTrajectoryAction)
+        rospy.loginfo("waiting for base_controller/follow_joint_trajectory action ...")
+        self.move_base_trajectory_action.wait_for_server()
         self.ri = PR2ROSRobotInterface(self.r)
 
     def speech_cb(self, msg):
