@@ -44,6 +44,9 @@ class Idling(smach.State):
             return 'list spots'
         if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
             floor_name = re.search(r'^(.*)階.*到着.*$', speech_raw).group(1)
+            if not floor_name in floors:
+                self.speak.parrot(speech_raw)
+                return 'aborted'
             self.speak.say('{}階ですね。'.format(floor_name))
             floor_name = floors[floor_name]
             self.eus_floor(floor=floor_name)

@@ -154,10 +154,13 @@ class WaitforNextFloor(smach.State):
 
         # 到着をまつ
         rospy.loginfo('waiting ...')
-        if wait_for_speech(timeout=300):
+        if wait_for_speech():
             speech_raw = rospy.get_param('~speech_raw').encode('utf-8')
             rospy.delete_param('~speech_raw')
             if re.search(r'^(.*)階.*到着.*$', speech_raw) is not None:
+                if not re.search(r'^(.*)階.*$', speech_raw).group(1) in floors:
+                    self.speak.parrot(speech_raw)
+                    return 'aborted'
                 self.floor_name = re.search(r'^(.*)階.*$', speech_raw).group(1)
                 self.speak.say('{}階ですね。ちょっと待ってください'.format(self.floor_name))
                 floor_name = floors[self.floor_name]
