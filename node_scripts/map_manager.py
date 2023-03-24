@@ -99,7 +99,7 @@ class MapManager(object):
         # self.dir_path = '/tmp/raw_maps'
         if not os.path.exists(self.dir_path):
             os.mkdir(self.dir_path)
-        self.scan_topic = rospy.get_param('~scan_topic', '/base_scan_filtered/scan')
+        self.scan_topic = rospy.get_param('~scan_topic', '/base_scan_filtered_mux/scan')
         self.rs = RobotService()
         self.procs = {}
         self.current_floor = None
