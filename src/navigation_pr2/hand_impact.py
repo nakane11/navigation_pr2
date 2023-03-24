@@ -12,6 +12,8 @@ from geometry_msgs.msg import Twist
 from pr2_gripper_sensor_msgs.msg import PR2GripperEventDetectorAction, PR2GripperEventDetectorGoal
 import pr2_gripper_sensor_msgs.msg
 from navigation_pr2.utils import *
+from robothand.msg import StartHoldingAction, StartHoldingActionResult
+from pr2_mechanism_msgs.srv import SwitchController
 
 class WaitforHandImpact(smach.State):
     def __init__(self):
@@ -79,4 +81,50 @@ class ChangeSpeed(smach.State):
         self.dr.update_configuration({"max_vel_x" : 2.5})
         self.dr.update_configuration({"acc_lim_x" : 2.5})
         self.dr.update_configuration({"acc_lim_theta" : 5.0})
+        return 'succeeded'
+
+class WaitforHandRelease(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded', 'preempted'])
+        self.flag = False
+        rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
+        rospy.wait_for_service('/pr2_controller_manager/switch_controller')
+        self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
+        self.sub = rospy.Subscriber('/release/result', StartHoldingActionResult, self.cb)
+
+    def cb(self, msg):
+        if msg.result.result:
+            # self.flag = True
+            self.flag = False
+
+    def execute(self, userdata):
+        while True:
+            if self.preempt_requested():
+                self.service_preempt()
+                return 'preempted'
+            if self.flag:
+                break
+        # 手を固定
+        ret = self.controller(['l_arm_controller'], [], None)
+        return 'succeeded'
+
+class WaitforHandHold(smach.State):
+    def __init__(self, client):
+        smach.State.__init__(self, outcomes=['succeeded', 'preempted'])
+        self.speak = client
+        self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
+        rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
+        rospy.wait_for_service('/pr2_controller_manager/switch_controller')
+        self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
+        self.ac = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.pub = rospy.Publisher('/base_controller/command', Twist, queue_size=1)
+
+    def execute(self, userdata):
+        self.ac.cancel_all_goals()
+        self.pub.publish(Twist())
+        goal = StartHoldingGoal(command=0)
+        self.hand_client.send_goal(goal)
+        self.hand_client.wait_for_result()
+        ret = self.controller([], ['l_arm_controller'], None)
+        self.speak.say('案内を再開します')
         return 'succeeded'

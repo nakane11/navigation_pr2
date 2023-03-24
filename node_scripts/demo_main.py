@@ -154,15 +154,19 @@ class NavigationSmach():
                                                         'preempted':'aborted'})
                 sm_hand_impact = smach.StateMachine(outcomes=['aborted', 'succeeded'])
                 with sm_hand_impact:
-                    smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
+                    # smach.StateMachine.add('WAIT_FOR_HAND_IMPACT', WaitforHandImpact(),
+                    #                        transitions={'succeeded':'succeeded',
+                    #                                     'detected':'WAIT_FOR_HAND_IMPACT',
+                    #                                     'preempted':'aborted',
+                    #                                     'aborted':'WAIT_FOR_HAND_IMPACT'})
+
+                    smach.StateMachine.add('WAIT_FOR_HAND_RELEASE', WaitforHandRelease(),
                                            transitions={'succeeded':'succeeded',
-                                                        'detected':'WAIT_FOR_HAND_IMPACT',
-                                                        'preempted':'aborted',
-                                                        'aborted':'WAIT_FOR_HAND_IMPACT'})
+                                                        'preempted':'aborted'})
 
                 smach.Concurrence.add('SEND_WAYPOINT', sm_send_waypoint)
                 smach.Concurrence.add('TALK_IN_MOVING', sm_talk_in_moving)
-                # smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
+                smach.Concurrence.add('HAND_IMPACT', sm_hand_impact)
 
             sm_navigation_elevator = smach.StateMachine(outcomes=['succeeded', 'aborted'],
                                                         input_keys=['riding_position', 'adjust_riding', 'waypoints', 'next_point'])
@@ -229,7 +233,7 @@ class NavigationSmach():
                                                 'succeeded':'FINISH_NAVIGATION',
                                                 'start mapping':'start mapping',
                                                 'interrupt':'INTERRUPT',
-                                                'ask':'ASK_WHAT',
+                                                'ask':'WAIT_FOR_HAND_HOLD',
                                                 'reached': 'FINISH_NAVIGATION',
                                                 'elevator':'NAVIGATION_ELEVATOR'})
             smach.StateMachine.add('INTERRUPT', Interrupt(),
@@ -238,6 +242,9 @@ class NavigationSmach():
             smach.StateMachine.add('ASK_WHAT', AskWhat(client=self.speak),
                                    transitions={'timeout':'MOVING',
                                                 'interrupt':'INTERRUPT',
+                                                'preempted':'FINISH_NAVIGATION'})
+            smach.StateMachine.add('WAIT_FOR_HAND_HOLD', WaitforHandHold(client=self.speak),
+                                   transitions={'succeeded': 'MOVING',
                                                 'preempted':'FINISH_NAVIGATION'})
             smach.StateMachine.add('FINISH_NAVIGATION', FinishNavigation(),
                                    transitions={'succeeded': 'succeeded'})

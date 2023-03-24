@@ -425,8 +425,8 @@ class StartNavigation(smach.State):
         return 'succeeded'
 
 def con_moving_child_term_cb(outcome_map):
-    # if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded' or outcome_map['HAND_IMPACT'] == 'succeeded':
-    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
+    if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded' or outcome_map['HAND_IMPACT'] == 'succeeded':
+    # if outcome_map['SEND_WAYPOINT'] == 'succeeded' or outcome_map['TALK_IN_MOVING'] == 'succeeded':
         return True
     if outcome_map['TALK_IN_MOVING'] == 'interrupt':
         return True
@@ -440,8 +440,8 @@ def con_moving_child_term_cb(outcome_map):
         return False
 
 def con_moving_out_cb(outcome_map):
-    # if outcome_map['HAND_IMPACT'] == 'succeeded':
-    #     return 'ask'
+    if outcome_map['HAND_IMPACT'] == 'succeeded':
+        return 'ask'
     if outcome_map['SEND_WAYPOINT'] == 'succeeded':
         return 'reached'
     if outcome_map['TALK_IN_MOVING'] == 'succeeded':
