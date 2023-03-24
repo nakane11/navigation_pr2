@@ -1,0 +1,108 @@
+<launch>
+  <arg name="launch_sound_play" default="false" doc="Launch sound_play node to speak" />
+  <arg name="launch_audio_capture" default="false" doc="Launch audio_capture node to publish audio topic from microphone" />
+
+  <arg name="raw_audio_topic" default="/audio" doc="Name of audio topic captured from microphone" />
+  <arg name="dummy_audio_topic" default="/dummy_audio" doc="Dummy audio" />
+  <arg name="audio_topic" default="/input_audio" doc="Name of audio topic captured from microphone" />
+  <arg name="n_channel" default="1" doc="Number of channels of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="depth" default="16" doc="Bit depth of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="sample_rate" default="16000" doc="Frame rate of audio topic and microphone. '$ pactl list short sinks' to check your hardware"/>
+  <arg name="device" default="" doc="Card and device number of microphone (e.g. hw:0,0). you can check card number and device number by '$ arecord -l', then uses hw:[card number],[device number]" />
+  <arg name="language" default="ja-JP" doc="Speech to text language. For Japanese, set ja-JP." />
+  <arg name="continuous" default="true" doc="If false, /speech_recognition service is published. If true, /Tablet/voice topic is published." />
+
+  <group ns="robotsound" >
+    <node name="is_speaking"
+          pkg="sound_play" type="is_speaking.py" >
+      <remap from="~robotsound" to="status" />
+      <remap from="~output/is_speaking" to="is_speaking" />
+    </node>
+  </group>
+
+  <group ns="robotsound_jp" >
+    <node name="is_speaking"
+          pkg="sound_play" type="is_speaking.py" >
+      <remap from="~robotsound" to="status" />
+      <remap from="~output/is_speaking" to="is_speaking" />
+    </node>
+  </group>
+
+  <node name="boolean_node_for_speaking"
+        pkg="jsk_topic_tools" type="boolean_node.py"
+        clear_params="true" >
+    <remap from="~input1" to="/robotsound/is_speaking" />
+    <remap from="~input2" to="/robotsound_jp/is_speaking" />
+    <remap from="~output/or" to="/is_speaking" />
+    <rosparam>
+      number_of_input: 2
+    </rosparam>
+  </node>
+
+  <node name="input_audio_mux"
+        pkg="topic_tools" type="mux"
+        respawn="true"
+	    args="$(arg audio_topic) $(arg raw_audio_topic) $(arg dummy_audio_topic)">
+    <remap from="mux" to="input_audio_mux" />
+  </node>
+
+  <node name="input_audio_selector"
+        pkg="jsk_robot_startup" type="mux_selector.py"
+	    respawn="true"
+	        args="/is_speaking 'm.data is False' $(arg raw_audio_topic) /is_speaking 'm.data is True' $(arg dummy_audio_topic)">
+    <remap from="mux" to="input_audio_mux" />
+    <param name="default_select" value="$(arg dummy_audio_topic)" />
+    <param name="wait" value="true" />
+  </node>
+
+  <!-- sound play -->
+  <node name="sound_play" pkg="sound_play" type="soundplay_node.py"
+        if="$(arg launch_sound_play)"
+        respawn="true">
+    <remap from="robotsound" to="sound_play" />
+  </node>
+
+  <!-- audio capture from microphone -->
+  <node name="audio_capture" pkg="audio_capture" type="audio_capture"
+        if="$(arg launch_audio_capture)"
+        respawn="true">
+    <rosparam subst_value="true">
+      format: wave
+      channels: $(arg n_channel)
+      depth: $(arg depth)
+      sample_rate: $(arg sample_rate)
+    </rosparam>
+    <param name="device" value="$(arg device)" />
+  </node>
+  
+  <node name="speech_recognition_vosk"
+        pkg="ros_speech_recognition" type="speech_recognition_node.py"
+        output="screen"
+        respawn="true" >
+    <remap from="sound_play" to="robotsound" />
+    <remap from="/Tablet/voice_stamped" to="/Tablet/voice_stamped/vosk" />
+    <rosparam subst_value="true">
+      audio_topic: $(arg audio_topic)
+      voice_topic: /Tablet/voice/vosk
+      n_channel: $(arg n_channel)
+      depth: $(arg depth)
+      sample_rate: $(arg sample_rate)
+      engine: Vosk
+      language: $(arg language)
+      continuous: $(arg continuous)
+      enable_sound_effect: false
+      vosk_model_path: /home/nakane/ros/pr2_ws/src/ros-vosk/models/vosk-model-ja-0.22
+      self_cancellation: false
+    </rosparam>
+  </node>
+
+  <node name="filter_vosk" pkg="navigation_pr2" type="filter_vosk.py"
+        respawn="true" output="screen"/>
+
+  <node name="input_sr_mux" pkg="topic_tools" type="mux"
+        respawn="true"
+        args="/Tablet/voice_stamped/mux /Tablet/voice_stamped/google /Tablet/voice_stamped/vosk_filtered">
+    <remap from="mux" to="input_sr_mux" />
+  </node>
+
+</launch>

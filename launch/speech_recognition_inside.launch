@@ -1,0 +1,39 @@
+<launch>
+  <arg name="launch_sound_play" default="false" doc="Launch sound_play node to speak" />
+  <arg name="launch_audio_capture" default="false" doc="Launch audio_capture node to publish audio topic from microphone" />
+
+  <arg name="raw_audio_topic" default="/audio" doc="Name of audio topic captured from microphone" />
+  <arg name="dummy_audio_topic" default="/dummy_audio" doc="Dummy audio" />
+  <arg name="audio_topic" default="/input_audio" doc="Name of audio topic captured from microphone" />
+  <arg name="n_channel" default="1" doc="Number of channels of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="depth" default="16" doc="Bit depth of audio topic and microphone. '$ pactl list short sinks' to check your hardware" />
+  <arg name="sample_rate" default="16000" doc="Frame rate of audio topic and microphone. '$ pactl list short sinks' to check your hardware"/>
+  <arg name="device" default="" doc="Card and device number of microphone (e.g. hw:0,0). you can check card number and device number by '$ arecord -l', then uses hw:[card number],[device number]" />
+  <arg name="language" default="ja-JP" doc="Speech to text language. For Japanese, set ja-JP." />
+  <arg name="continuous" default="true" doc="If false, /speech_recognition service is published. If true, /Tablet/voice topic is published." />
+  
+  <node name="speech_recognition_google"
+        pkg="ros_speech_recognition" type="speech_recognition_node.py"
+        output="screen"
+        respawn="true" >
+    <remap from="sound_play" to="robotsound" />
+    <remap from="/Tablet/voice_stamped" to="/Tablet/voice_stamped/google" />
+    <rosparam subst_value="true">
+      audio_topic: $(arg audio_topic)
+      voice_topic: /Tablet/voice/google
+      n_channel: $(arg n_channel)
+      depth: $(arg depth)
+      sample_rate: $(arg sample_rate)
+      engine: Google
+      language: $(arg language)
+      continuous: $(arg continuous)
+      enable_sound_effect: false
+      self_cancellation: false
+      operation_timeout: 15.0
+    </rosparam>
+  </node>
+
+  <node name="sr_selector" pkg="navigation_pr2" type="sr_selector.py"
+        respawn="true" />
+
+</launch>

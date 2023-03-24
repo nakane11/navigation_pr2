@@ -1,13 +1,10 @@
 <launch>
-  <arg name="use_vosk" default="false" doc="Use ros_vosk for speech recognition" />
 
   <arg name="INPUT_IMAGE" default="/kinect_head/rgb/image_rect_color" />
   <arg name="INPUT_DEPTH_IMAGE" default="/kinect_head/depth_registered/hw_registered/image_rect" />
   <arg name="INPUT_CAMERA_INFO" default="/kinect_head/rgb/camera_info" />
   
-  <include file="$(find navigation_pr2)/launch/speech_recognition.launch" >
-    <arg name="use_vosk" value="$(arg use_vosk)" />
-  </include>
+  <include file="$(find navigation_pr2)/launch/speech_recognition_outside.launch" />
 
   <include file="$(find jsk_perception)/launch/hand_pose_estimation_2d.launch">
     <arg name="gui" value="false" />
@@ -18,11 +15,11 @@
     <arg name="with_depth" value="true" />
   </include>
 
-  <node name="ping" pkg="navigation_pr2" type="ping.py"
-        respawn="true" >
-    <param name="tries" value="1" />
-    <param name="timeout" value="2" />
-    <param name="host" value="8.8.8.8" />
-  </node>
+  <!-- <node name="ping" pkg="navigation_pr2" type="ping.py" -->
+  <!--       respawn="true" > -->
+  <!--   <param name="tries" value="1" /> -->
+  <!--   <param name="timeout" value="2" /> -->
+  <!--   <param name="host" value="8.8.8.8" /> -->
+  <!-- </node> -->
   
 </launch>
