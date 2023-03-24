@@ -10,7 +10,7 @@ class FilterVosk(object):
         self.pub_stamped = rospy.Publisher("/Tablet/voice_stamped/vosk_filtered", SpeechRecognitionCandidatesStamped, queue_size=1)
         self.sub = rospy.Subscriber("/Tablet/voice/vosk", SpeechRecognitionCandidates, self.cb, queue_size=1)
         self.sub_stamped = rospy.Subscriber("/Tablet/voice_stamped/vosk", SpeechRecognitionCandidatesStamped, self.cb_stamped, queue_size=1)
-        self.black_list = ["あー", "えー", "ん", "あ", "うん", "えーん", "んん", "", "ああ", "う", "なぁ"]
+        self.black_list = ["あー", "えー", "ん", "あ", "うん", "えーん", "んん", "", "ああ", "う", "なぁ", "え"]
         
     def cb(self, msg):
         msg.transcript[0] = msg.transcript[0].replace(' ', '')
