@@ -1,0 +1,12 @@
+<launch>
+  <arg name="tetsunagi" default="true" />
+  
+  <include file="$(find navigation_pr2)/launch/navigation_pr2_outside.launch" />
+
+  <group if="$(arg tetsunagi)" >
+    <include file="$(find robothand)/launch/robothand.launch" >
+      <arg name="rosserial" value="false" />
+    </include>
+  </group>
+  
+</launch>

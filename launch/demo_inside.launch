@@ -1,0 +1,16 @@
+<launch>
+  <arg name="tetsunagi" default="true" />
+
+  <include file="$(find navigation_pr2)/launch/navigation_pr2.launch" />
+
+  <node name="navigation_state_machine"
+        pkg="navigation_pr2" type="demo_main.py"
+        output="screen" respawn="false"
+        clear_params="true" >
+    <rosparam subst_value="true">
+	  tetsunagi: $(arg tetsunagi)
+      use_hand: $(arg tetsunagi)
+    </rosparam>
+  </node>
+
+</launch>

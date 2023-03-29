@@ -19,8 +19,11 @@ class StopHandHolding(smach.State):
             self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
             rospy.loginfo('waiting for start_hand_holding...')
             self.hand_client.wait_for_server()
+        self.tetsunagi = rospy.get_param('~tetsunagi', False)
 
     def execute(self, userdata):
+        if not self.tetsunagi:
+            return 'succeeded'
         if self.use_hand:
             goal = StartHoldingGoal(command=3)
             self.hand_client.send_goal(goal)
@@ -41,12 +44,16 @@ class ResumeHandHolding(smach.State):
         self.use_hand = rospy.get_param('~use_hand', False)
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.debug = rospy.get_param('~debug', False)
+        self.tetsunagi = rospy.get_param('~tetsunagi', False)
         if self.use_hand:
             self.hand_client = actionlib.SimpleActionClient('start_hand_holding', StartHoldingAction)
             rospy.loginfo('waiting for start_hand_holding...')
             self.hand_client.wait_for_server()
 
     def execute(self, userdata):
+        if not self.tetsunagi:
+            self.speak.say('移動します')
+            return 'succeeded'
         self.speak.say('手を繋いで下さい')
             # 手繋ぎ
         if self.use_hand:

@@ -201,7 +201,7 @@ class HoldDoor(smach.State):
                     if (rospy.Time.now() - start_time).to_sec() > 10:
                         break
         # 乗り込んだらtuckarm
-        rospy.sleep(5)
+        rospy.sleep(1)
         self.r.rarm.angle_vector(np.deg2rad([-6.6127, 60.5828, -122.994, -74.8254, 56.2071, -5.72958, 10.8427]))
         self.ri.angle_vector(self.r.angle_vector(), controller_type='rarm_controller')
         self.ri.wait_interpolation()

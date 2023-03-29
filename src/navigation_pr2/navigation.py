@@ -250,6 +250,7 @@ class SendMoveTo(smach.State):
         smach.State.__init__(self, outcomes=['succeeded', 'aborted', 'preempted', 'elevator'],
                              input_keys=['next_point', 'waypoints', 'status'])
         self.debug = rospy.get_param('~debug', False)
+        self.tetsunagi = rospy.get_param('~tetsunagi', False)
         self.distance_tolerance = rospy.get_param('~waypoint_distance_tolerance', 0.5)
         self.max_retry = rospy.get_param("~max_retry", 3)
         self.max_retry_without_hand = rospy.get_param("~max_retry_without_hand", 3)
@@ -315,14 +316,15 @@ class SendMoveTo(smach.State):
                     continue
                 elif retry_count < self.max_retry + self.max_retry_without_hand:
                     rospy.logwarn('Retry send goals: {}'.format(retry_count))
-                    ret = self.controller(['l_arm_controller'], [], None)
-                    self.speak.say('手を離して下さい')
-                    if self.use_hand:
-                        goal = StartHoldingGoal(command=3)
-                        self.hand_client.wait_for_result(timeout=rospy.Duration(40))
-                    goal = SwitchGoal(switch=False)
-                    self.ac.send_goal(goal)
-                    self.ac.wait_for_result(timeout=rospy.Duration(40))
+                    if self.tetsunagi:
+                        ret = self.controller(['l_arm_controller'], [], None)
+                        self.speak.say('手を離して下さい')
+                        if self.use_hand:
+                            goal = StartHoldingGoal(command=3)
+                            self.hand_client.wait_for_result(timeout=rospy.Duration(40))
+                        goal = SwitchGoal(switch=False)
+                        self.ac.send_goal(goal)
+                        self.ac.wait_for_result(timeout=rospy.Duration(40))
                     self.client.send_goal(goal_msg)
                     rospy.sleep(0.5)
                     retry_count += 1
@@ -362,10 +364,14 @@ class FinishNavigation(smach.State):
         rospy.loginfo('waiting for pr2_controller_manager/switch_controller...')
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
+        self.tetsunagi = rospy.get_param('~tetsunagi', False)
 
     def execute(self, userdata):
         # 手繋ぎをやめる
-        if self.debug:
+        if not self.tetsunagi:
+            rospy.loginfo('skipped finishnavigation')
+            return 'succeeded'
+        elif self.debug:
             rospy.loginfo('skipped finishnavigation')
         else:
             ret = self.controller(['l_arm_controller'], [], None)
@@ -391,8 +397,14 @@ class StartNavigation(smach.State):
         rospy.wait_for_service('/pr2_controller_manager/switch_controller')
         self.controller = rospy.ServiceProxy('/pr2_controller_manager/switch_controller', SwitchController)
         self.speak = client
+        self.tetsunagi = rospy.get_param('~tetsunagi', False)
 
     def execute(self, userdata):
+        if not self.tetsunagi:
+            rospy.loginfo('skipped move_wrist')
+            self.speak.say('案内を開始します')
+            userdata.status = ''
+            return 'succeeded'
         self.speak.say('正面に立って下さい')
         if self.debug:
             rospy.loginfo('skipped move_wrist')
