@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find navigation_pr2)/sample/include/play_rosbag_robomech_navigation.xml" />
+
+</launch>
