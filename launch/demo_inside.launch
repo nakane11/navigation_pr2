@@ -8,7 +8,7 @@
         output="screen" respawn="false"
         clear_params="true" >
     <rosparam subst_value="true">
-	  tetsunagi: $(arg tetsunagi)
+      tetsunagi: $(arg tetsunagi)
       use_hand: $(arg tetsunagi)
     </rosparam>
   </node>
